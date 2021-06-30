@@ -7,7 +7,7 @@ type alias Position =
 
 
 diff : Position -> Position -> ( Float, Float )
-diff ( a1, a2 ) ( b1, b2 ) =
+diff ( b1, b2 ) ( a1, a2 ) =
     ( a1 - b1, a2 - b2 )
 
 

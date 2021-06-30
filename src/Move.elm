@@ -1,8 +1,10 @@
 module Move exposing (..)
 
+import Array
 import Card exposing (Card)
 import Position exposing (Position)
-import Table exposing (CardLoc(..))
+import Table exposing (CardLoc(..), Table)
+import Table.View exposing (pileDepthOffset)
 
 
 type Move
@@ -19,7 +21,7 @@ new : CardLoc -> Card -> List Card -> Position -> Move
 new cardLoc topCard pile position =
     let
         zIndexInHand depth card =
-            { card | zIndex = Table.zIndexFor (Hand depth) }
+            { card | zIndex = Table.View.zIndexFor (Hand depth) }
     in
     Move
         { from = cardLoc
@@ -34,10 +36,15 @@ update : Position -> Move -> Move
 update mousePosition (Move move) =
     let
         positionDiff =
-            Position.diff mousePosition move.mouseStart
+            Position.diff move.mouseStart mousePosition
 
         updateCardPosition depth card =
-            { card | position = Position.add move.topCardStart positionDiff }
+            { card
+                | position =
+                    positionDiff
+                        |> Position.add move.topCardStart
+                        |> Position.diff ( 0, pileDepthOffset depth )
+            }
 
         updatedPile =
             List.indexedMap updateCardPosition move.pile
@@ -48,3 +55,38 @@ update mousePosition (Move move) =
 getPile : Move -> List Card
 getPile (Move { pile }) =
     pile
+
+
+reverse : Table -> Move -> Table
+reverse table (Move move) =
+    case move.from of
+        CascadeLoc column _ ->
+            let
+                columnStillInPlace =
+                    table.cascades
+                        |> Array.get column
+                        |> Maybe.withDefault []
+
+                repositionCard pileDepth depth card =
+                    { card
+                        | position =
+                            move.from
+                                |> Table.View.positionFor
+                                |> Position.add ( 0, toFloat (List.length columnStillInPlace + pileDepth - depth - 1) * Table.View.pileSpacing )
+                        , zIndex = Table.View.zIndexFor move.from + pileDepth - depth - 1
+                    }
+
+                repositionedMovePile =
+                    move.pile
+                        |> List.indexedMap (repositionCard (List.length move.pile))
+
+                resetColumn =
+                    List.concat [ columnStillInPlace, repositionedMovePile ]
+
+                updatedCascades =
+                    Array.set column resetColumn table.cascades
+            in
+            { table | cascades = updatedCascades }
+
+        Hand _ ->
+            table

@@ -1,9 +1,11 @@
 module Game exposing (..)
 
+import Card exposing (Card)
 import Deck exposing (Deck)
 import Move exposing (Move)
 import Position exposing (Position)
-import Table exposing (Table)
+import Table exposing (CardLoc, Table)
+import Table.View
 
 
 type alias Game =
@@ -19,15 +21,26 @@ type State
 
 new : Deck -> Game
 new deck =
-    Game (Table.new deck) Ready
+    let
+        table =
+            Table.new
+    in
+    Game { table | cascades = Table.View.deal deck } Ready
 
 
-startMove : Move -> Game -> Game
-startMove move game =
+startMove : CardLoc -> Card -> Position -> Game -> Game
+startMove cardLoc card position game =
     -- TODO starting a move removes the cards from their location
     case game.state of
         Ready ->
-            { game | state = PlayerMove move }
+            let
+                ( pile, table ) =
+                    Table.pickPile cardLoc game.table
+
+                move =
+                    Move.new cardLoc card pile position
+            in
+            Game table (PlayerMove move)
 
         PlayerMove _ ->
             game
@@ -43,11 +56,11 @@ updateMove position game =
             { game | state = PlayerMove (Move.update position lastMove) }
 
 
-endMove : Position -> Game -> Game
-endMove endingPos game =
+endMove : Game -> Game
+endMove game =
     case game.state of
         Ready ->
             game
 
-        PlayerMove _ ->
-            { game | state = Ready }
+        PlayerMove move ->
+            Game (Move.reverse game.table move) Ready

@@ -1,10 +1,7 @@
 module Table exposing (..)
 
+import Array exposing (Array)
 import Card exposing (Card)
-import Card.View
-import Deck exposing (Deck)
-import Position exposing (Position)
-import Table.View
 
 
 type alias FoundationD =
@@ -24,8 +21,8 @@ type alias FoundationS =
 
 
 type alias Table =
-    { cells : List (Maybe Card)
-    , cascades : List (List Card)
+    { cells : Array (Maybe Card)
+    , cascades : Array (List Card)
     , foundationD : FoundationD
     , foundationC : FoundationC
     , foundationH : FoundationH
@@ -50,73 +47,37 @@ type CardLoc
     | Hand Depth
 
 
-positionFor : CardLoc -> Position
-positionFor cardLoc =
-    case cardLoc of
-        CascadeLoc column row ->
-            let
-                left =
-                    Table.View.cascadesOffset + toFloat column * (Card.View.width + Table.View.padding)
-
-                top =
-                    Table.View.cascadesTop + toFloat row * Table.View.pileSpacing
-            in
-            ( left, top )
-
-        Hand _ ->
-            ( 0, 0 )
+cascadesCount : Int
+cascadesCount =
+    8
 
 
-zIndexFor : CardLoc -> Int
-zIndexFor cardLoc =
-    case cardLoc of
-        CascadeLoc _ row ->
-            row
-
-        Hand depth ->
-            150 - depth
-
-
-recursiveDeal : Int -> List (List Card) -> List (List Card) -> Deck -> List (List Card)
-recursiveDeal row cascades alreadyDealt deck =
-    case cascades of
-        [] ->
-            recursiveDeal (row + 1) (List.reverse alreadyDealt) cascades deck
-
-        cascade :: remainingCascades ->
-            let
-                ( topCard, restDeck ) =
-                    Deck.draw deck
-            in
-            case topCard of
-                Just card ->
-                    let
-                        column =
-                            List.length alreadyDealt
-
-                        cardLoc =
-                            CascadeLoc column row
-
-                        positionedCard =
-                            { card | position = positionFor cardLoc, zIndex = zIndexFor cardLoc }
-                    in
-                    recursiveDeal row remainingCascades ((positionedCard :: cascade) :: alreadyDealt) restDeck
-
-                Nothing ->
-                    List.concat [ List.reverse alreadyDealt, cascades ]
-
-
-deal : Deck -> List (List Card)
-deal deck =
-    recursiveDeal 0 [ [], [], [], [], [], [], [], [] ] [] deck
-
-
-new : Deck -> Table
-new deck =
-    { cells = [ Nothing, Nothing, Nothing, Nothing ]
-    , cascades = deal deck
+new : Table
+new =
+    { cells = Array.initialize 4 (always Nothing)
+    , cascades = Array.empty
     , foundationD = []
     , foundationC = []
     , foundationH = []
     , foundationS = []
     }
+
+
+pickPile : CardLoc -> Table -> ( List Card, Table )
+pickPile cardLoc table =
+    case cardLoc of
+        CascadeLoc column row ->
+            let
+                pile =
+                    -- TODO : Cascades should be its own type so that I don't have to add the default always
+                    table.cascades
+                        |> Array.get column
+                        |> Maybe.withDefault []
+
+                updatedTable =
+                    { table | cascades = Array.set column [] table.cascades }
+            in
+            ( pile, updatedTable )
+
+        Hand depth ->
+            ( [], table )

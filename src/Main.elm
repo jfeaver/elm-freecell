@@ -1,5 +1,6 @@
 module Main exposing (..)
 
+import Array
 import Browser exposing (Document)
 import Card exposing (Card)
 import Card.View
@@ -36,7 +37,7 @@ type Msg
     | RequestNewGame
     | MouseDown ( CardLoc, Card ) Event
     | MouseMove Event
-    | MouseUp Event
+    | MouseUp
 
 
 startGame : Cmd Msg
@@ -72,7 +73,7 @@ update msg model =
                         updatedGame =
                             case button of
                                 Html.Events.Extra.Mouse.MainButton ->
-                                    Game.startMove (Move.new cardLoc card [ card ] clientPos) game
+                                    Game.startMove cardLoc card clientPos game
 
                                 _ ->
                                     game
@@ -91,7 +92,7 @@ update msg model =
                     in
                     ( InGame updatedGame, Cmd.none )
 
-        MouseUp { clientPos } ->
+        MouseUp ->
             case model of
                 MainMenu ->
                     ( model, Cmd.none )
@@ -99,7 +100,7 @@ update msg model =
                 InGame game ->
                     let
                         updatedGame =
-                            Game.endMove clientPos game
+                            Game.endMove game
                     in
                     ( InGame updatedGame, Cmd.none )
 
@@ -129,7 +130,7 @@ body model =
                     , height (px Table.View.height)
                     ]
                 , onMove MouseMove |> Html.Styled.Attributes.fromUnstyled
-                , onUp MouseUp |> Html.Styled.Attributes.fromUnstyled
+                , onUp (always MouseUp) |> Html.Styled.Attributes.fromUnstyled
                 ]
                 [ cells game.table
                 , foundations game.table
@@ -146,8 +147,8 @@ header =
         ]
 
 
-cell : Int -> Maybe Card -> Html Msg
-cell n maybeCard =
+cell : ( Int, Maybe Card ) -> Html Msg
+cell ( n, maybeCard ) =
     maybeCard
         |> Maybe.map (\card -> div [] [])
         |> Maybe.withDefault
@@ -165,7 +166,7 @@ cell n maybeCard =
 
 cells : Table -> Html Msg
 cells table =
-    div [] (List.indexedMap cell table.cells)
+    table.cells |> Array.toIndexedList |> List.map cell |> div []
 
 
 foundations : Table -> Html Msg
@@ -212,8 +213,8 @@ foundations table =
         ]
 
 
-cascade : Int -> List Card -> Html Msg
-cascade n cards =
+cascade : ( Int, List Card ) -> Html Msg
+cascade ( n, cards ) =
     div []
         (div
             [ css
@@ -230,7 +231,7 @@ cascade n cards =
 
 cascades : Table -> Html Msg
 cascades table =
-    div [] (List.indexedMap cascade table.cascades)
+    table.cascades |> Array.toIndexedList |> List.map cascade |> div []
 
 
 cascadeCardView : Int -> Int -> Card -> Html Msg
