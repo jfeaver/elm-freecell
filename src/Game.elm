@@ -30,7 +30,6 @@ new deck =
 
 startMove : CardLoc -> Card -> Position -> Game -> Game
 startMove cardLoc card position game =
-    -- TODO starting a move removes the cards from their location
     case game.state of
         Ready ->
             let
@@ -63,4 +62,4 @@ endMove game =
             game
 
         PlayerMove move ->
-            Game (Move.reverse game.table move) Ready
+            Game (Move.finalize game.table move) Ready

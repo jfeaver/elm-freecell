@@ -4,16 +4,16 @@ import Array
 import Card exposing (Card)
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Table)
-import Table.View exposing (pileDepthOffset)
+import Table.View
 
 
 type Move
     = Move
         { from : CardLoc
+        , to : CardLoc
         , pile : List Card
         , topCardStart : Position
         , mouseStart : Position
-        , mouseCurrent : Position
         }
 
 
@@ -25,10 +25,10 @@ new cardLoc topCard pile position =
     in
     Move
         { from = cardLoc
+        , to = cardLoc
         , pile = List.indexedMap zIndexInHand pile
         , topCardStart = topCard.position
         , mouseStart = position
-        , mouseCurrent = position
         }
 
 
@@ -38,18 +38,18 @@ update mousePosition (Move move) =
         positionDiff =
             Position.diff move.mouseStart mousePosition
 
-        updateCardPosition depth card =
+        updateCardPosition pileDepth depth card =
             { card
                 | position =
                     positionDiff
                         |> Position.add move.topCardStart
-                        |> Position.diff ( 0, pileDepthOffset depth )
+                        |> Position.add ( 0, Table.View.pileDepthOffset (pileDepth - depth) )
             }
 
         updatedPile =
-            List.indexedMap updateCardPosition move.pile
+            List.indexedMap (updateCardPosition <| List.length move.pile - 1) move.pile
     in
-    Move { move | pile = updatedPile, mouseCurrent = mousePosition }
+    Move { move | pile = updatedPile }
 
 
 getPile : Move -> List Card
@@ -57,34 +57,34 @@ getPile (Move { pile }) =
     pile
 
 
-reverse : Table -> Move -> Table
-reverse table (Move move) =
-    case move.from of
+finalize : Table -> Move -> Table
+finalize table (Move move) =
+    case move.to of
         CascadeLoc column _ ->
             let
-                columnStillInPlace =
+                columnInPlace =
                     table.cascades
                         |> Array.get column
                         |> Maybe.withDefault []
 
-                repositionCard pileDepth depth card =
+                positionCard pileDepth depth card =
                     { card
                         | position =
-                            move.from
+                            move.to
                                 |> Table.View.positionFor
-                                |> Position.add ( 0, toFloat (List.length columnStillInPlace + pileDepth - depth) * Table.View.pileSpacing )
-                        , zIndex = Table.View.zIndexFor move.from + pileDepth - depth
+                                |> Position.add ( 0, Table.View.pileDepthOffset (pileDepth - depth) )
+                        , zIndex = Table.View.zIndexFor move.to + pileDepth - depth
                     }
 
-                repositionedMovePile =
+                positionedMovePile =
                     move.pile
-                        |> List.indexedMap (repositionCard (List.length move.pile - 1))
+                        |> List.indexedMap (positionCard (List.length move.pile - 1))
 
-                resetColumn =
-                    List.concat [ columnStillInPlace, repositionedMovePile ]
+                buildColumn =
+                    List.concat [ positionedMovePile, columnInPlace ]
 
                 updatedCascades =
-                    Array.set column resetColumn table.cascades
+                    Array.set column buildColumn table.cascades
             in
             { table | cascades = updatedCascades }
 

@@ -13,7 +13,7 @@ import Html.Styled.Attributes exposing (css)
 import Html.Styled.Events exposing (onClick)
 import Move
 import Random
-import Table exposing (CardLoc(..), Column, Row, Table)
+import Table exposing (CardLoc(..), Column, Table)
 import Table.View
 
 

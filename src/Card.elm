@@ -32,3 +32,14 @@ type alias Card =
     , suit : Suit
     , rank : Rank
     }
+
+
+type alias CardPrototype =
+    { suit : Suit
+    , rank : Rank
+    }
+
+
+isCard : CardPrototype -> Card -> Bool
+isCard { suit, rank } card =
+    card.suit == suit && card.rank == rank
