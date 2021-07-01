@@ -3,7 +3,7 @@ module Move exposing (..)
 import Array
 import Card exposing (Card)
 import Position exposing (Position)
-import Table exposing (CardLoc(..), Table)
+import Table exposing (CardLoc(..), Column, Table)
 import Table.View
 
 
@@ -81,6 +81,7 @@ finalize table (Move move) =
                         |> List.indexedMap (positionCard (List.length move.pile - 1))
 
                 buildColumn =
+                    -- This could be done card by card in positionedMovePile/positionCard
                     List.concat [ positionedMovePile, columnInPlace ]
 
                 updatedCascades =
@@ -90,3 +91,17 @@ finalize table (Move move) =
 
         Hand _ ->
             table
+
+
+toColumn : Column -> Table -> Move -> Move
+toColumn column table (Move move) =
+    let
+        cascade =
+            table.cascades
+                |> Array.get column
+                |> Maybe.withDefault []
+
+        moveRow =
+            List.length cascade
+    in
+    Move { move | to = CascadeLoc column moveRow }

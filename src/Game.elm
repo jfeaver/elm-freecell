@@ -1,11 +1,12 @@
 module Game exposing (..)
 
+import Array
 import Card exposing (Card)
 import Deck exposing (Deck)
 import Move exposing (Move)
 import Position exposing (Position)
 import Table exposing (CardLoc, Table)
-import Table.View
+import Table.View exposing (TableLoc(..))
 
 
 type alias Game =
@@ -55,11 +56,31 @@ updateMove position game =
             { game | state = PlayerMove (Move.update position lastMove) }
 
 
-endMove : Game -> Game
-endMove game =
+valid : Bool
+valid =
+    True
+
+
+endMove : Maybe TableLoc -> Game -> Game
+endMove mTableLoc game =
     case game.state of
         Ready ->
             game
 
         PlayerMove move ->
-            Game (Move.finalize game.table move) Ready
+            let
+                theMove =
+                    case mTableLoc of
+                        Just tableLoc ->
+                            case tableLoc of
+                                TableCascade column ->
+                                    if valid then
+                                        Move.toColumn column game.table move
+
+                                    else
+                                        move
+
+                        Nothing ->
+                            move
+            in
+            Game (Move.finalize game.table theMove) Ready

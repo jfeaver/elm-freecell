@@ -11,6 +11,10 @@ import Position exposing (Position)
 import Table exposing (CardLoc(..), Depth, cascadesCount)
 
 
+type TableLoc
+    = TableCascade Int
+
+
 width : Float
 width =
     800
@@ -88,6 +92,31 @@ positionFor cardLoc =
 
         Hand _ ->
             ( 0, 0 )
+
+
+locFor : Position -> Maybe TableLoc
+locFor ( left, top ) =
+    let
+        halfPadding =
+            padding / 2
+
+        leftCascadesOffset =
+            cascadesOffset - halfPadding
+
+        topCascadesOffset =
+            cascadesTop - halfPadding
+
+        leftCascades =
+            left - leftCascadesOffset
+
+        topCascades =
+            top - topCascadesOffset
+    in
+    if topCascades < 0 || leftCascades < 0 || left > (width - leftCascadesOffset) then
+        Nothing
+
+    else
+        Just <| TableCascade (floor (leftCascades / (Card.View.width + padding)))
 
 
 recursiveDeal : Int -> Int -> Array (List Card) -> Deck -> Array (List Card)

@@ -2,6 +2,7 @@ module Main exposing (..)
 
 import Array
 import Browser exposing (Document)
+import Browser.Dom exposing (Element)
 import Card exposing (Card)
 import Card.View
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
@@ -9,12 +10,14 @@ import Deck exposing (Deck)
 import Game exposing (Game)
 import Html.Events.Extra.Mouse exposing (Event, onDown, onMove, onUp)
 import Html.Styled as Html exposing (Attribute, Html, button, div, text)
-import Html.Styled.Attributes exposing (css)
+import Html.Styled.Attributes exposing (css, fromUnstyled, id)
 import Html.Styled.Events exposing (onClick)
 import Move
+import Position
 import Random
 import Table exposing (CardLoc(..), Column, Table)
 import Table.View
+import Task
 
 
 main : Program () Model Msg
@@ -37,7 +40,8 @@ type Msg
     | RequestNewGame
     | MouseDown ( CardLoc, Card ) Event
     | MouseMove Event
-    | MouseUp
+    | MouseUp Event
+    | EndMove (Result Browser.Dom.Error ( Element, Event ))
 
 
 startGame : Cmd Msg
@@ -92,17 +96,41 @@ update msg model =
                     in
                     ( InGame updatedGame, Cmd.none )
 
-        MouseUp ->
+        MouseUp event ->
+            let
+                getElement =
+                    Browser.Dom.getElement "table"
+
+                elementWithEvent el =
+                    ( el, event )
+            in
+            ( model, Task.attempt EndMove <| Task.map elementWithEvent getElement )
+
+        EndMove result ->
             case model of
                 MainMenu ->
                     ( model, Cmd.none )
 
                 InGame game ->
-                    let
-                        updatedGame =
-                            Game.endMove game
-                    in
-                    ( InGame updatedGame, Cmd.none )
+                    case result of
+                        Ok ( element, event ) ->
+                            let
+                                tablePosition =
+                                    ( element.element.x, element.element.y )
+
+                                mouseUpTablePosition =
+                                    Position.diff tablePosition event.clientPos
+
+                                mLastCardLoc =
+                                    Table.View.locFor mouseUpTablePosition
+
+                                updatedGame =
+                                    Game.endMove mLastCardLoc game
+                            in
+                            ( InGame updatedGame, Cmd.none )
+
+                        Err _ ->
+                            ( model, Cmd.none )
 
 
 view : Model -> Document Msg
@@ -129,8 +157,9 @@ body model =
                     , width (px Table.View.width)
                     , height (px Table.View.height)
                     ]
-                , onMove MouseMove |> Html.Styled.Attributes.fromUnstyled
-                , onUp (always MouseUp) |> Html.Styled.Attributes.fromUnstyled
+                , onMove MouseMove |> fromUnstyled
+                , onUp MouseUp |> fromUnstyled
+                , id "table"
                 ]
                 [ cells game.table
                 , foundations game.table
@@ -265,7 +294,7 @@ cardView cardLoc card =
                 ]
 
         dragNDrop =
-            [ onDown (MouseDown ( cardLoc, card )) |> Html.Styled.Attributes.fromUnstyled
+            [ onDown (MouseDown ( cardLoc, card )) |> fromUnstyled
             ]
 
         attrs =
