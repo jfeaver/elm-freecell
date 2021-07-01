@@ -3,6 +3,7 @@ module Table exposing (..)
 import Array exposing (Array)
 import Card exposing (Card)
 import List.Extra
+import Maybe.Extra
 
 
 type alias FoundationD =
@@ -39,12 +40,17 @@ type alias Row =
     Int
 
 
+type alias Cell =
+    Int
+
+
 type alias Depth =
     Int
 
 
 type CardLoc
     = CascadeLoc Column Row
+    | CellLoc Cell
     | Hand Depth
 
 
@@ -53,9 +59,14 @@ cascadesCount =
     8
 
 
+cellsCount : Int
+cellsCount =
+    4
+
+
 new : Table
 new =
-    { cells = Array.initialize 4 (always Nothing)
+    { cells = Array.initialize cellsCount (always Nothing)
     , cascades = Array.empty
     , foundationD = []
     , foundationC = []
@@ -90,3 +101,27 @@ pickPile cardLoc table =
 
         Hand _ ->
             ( [], table )
+
+        CellLoc cell ->
+            case getCell cell table of
+                Just card ->
+                    let
+                        updatedCells =
+                            Array.set cell Nothing table.cells
+                    in
+                    ( [ card ], { table | cells = updatedCells } )
+
+                Nothing ->
+                    ( [], table )
+
+
+getCell : Cell -> Table -> Maybe Card
+getCell cell { cells } =
+    Array.get cell cells
+        |> Maybe.Extra.dig
+
+
+cellEmpty : Cell -> Table -> Bool
+cellEmpty cell table =
+    getCell cell table
+        |> Maybe.Extra.isNothing

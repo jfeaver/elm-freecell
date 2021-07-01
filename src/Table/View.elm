@@ -7,12 +7,14 @@ import Css exposing (border3, borderRadius, hex, px, solid)
 import Deck exposing (Deck)
 import Html.Styled exposing (Attribute)
 import Html.Styled.Attributes exposing (css)
+import Maybe.Extra
 import Position exposing (Position)
-import Table exposing (CardLoc(..), Depth, cascadesCount)
+import Table exposing (CardLoc(..), Cell, Column, Depth, Row, cascadesCount, cellsCount)
 
 
 type TableLoc
-    = TableCascade Int
+    = TableCascade Column
+    | TableCell Cell
 
 
 width : Float
@@ -56,6 +58,21 @@ padding =
     12
 
 
+halfPadding : Float
+halfPadding =
+    padding / 2
+
+
+topOffset : Float
+topOffset =
+    40
+
+
+horizontalOffset : Float
+horizontalOffset =
+    30
+
+
 cascadesOffset : Float
 cascadesOffset =
     (width - toFloat cascadesCount * (Card.View.width + padding)) / 2
@@ -93,13 +110,13 @@ positionFor cardLoc =
         Hand _ ->
             ( 0, 0 )
 
+        CellLoc cell ->
+            ( horizontalOffset + toFloat cell * (Card.View.width + padding), topOffset )
 
-locFor : Position -> Maybe TableLoc
-locFor ( left, top ) =
+
+cascadesLocFor : Position -> Maybe TableLoc
+cascadesLocFor ( left, top ) =
     let
-        halfPadding =
-            padding / 2
-
         leftCascadesOffset =
             cascadesOffset - halfPadding
 
@@ -119,7 +136,40 @@ locFor ( left, top ) =
         Just <| TableCascade (floor (leftCascades / (Card.View.width + padding)))
 
 
-recursiveDeal : Int -> Int -> Array (List Card) -> Deck -> Array (List Card)
+cellsLocFor : Position -> Maybe TableLoc
+cellsLocFor ( left, top ) =
+    let
+        leftCellsOffset =
+            horizontalOffset - halfPadding
+
+        topCellsOffset =
+            topOffset - halfPadding
+
+        leftCells =
+            left - leftCellsOffset
+
+        topCells =
+            top - topCellsOffset
+
+        maxLeft =
+            toFloat cellsCount * (Card.View.width + padding)
+
+        maxTop =
+            Card.View.height + padding
+    in
+    if leftCells < 0 || leftCells > maxLeft || topCells < 0 || topCells > maxTop then
+        Nothing
+
+    else
+        Just <| TableCell (floor (leftCells / (Card.View.width + padding)))
+
+
+locFor : Position -> Maybe TableLoc
+locFor position =
+    Maybe.Extra.or (cascadesLocFor position) (cellsLocFor position)
+
+
+recursiveDeal : Row -> Column -> Array (List Card) -> Deck -> Array (List Card)
 recursiveDeal row column cascades deck =
     if column == cascadesCount then
         recursiveDeal (row + 1) 0 cascades deck
@@ -163,3 +213,6 @@ zIndexFor cardLoc =
 
         Hand depth ->
             150 - depth
+
+        CellLoc _ ->
+            1

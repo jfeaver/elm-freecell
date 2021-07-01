@@ -5,7 +5,7 @@ import Card exposing (Card)
 import Deck exposing (Deck)
 import Move exposing (Move)
 import Position exposing (Position)
-import Table exposing (CardLoc, Table)
+import Table exposing (CardLoc, Cell, Table)
 import Table.View exposing (TableLoc(..))
 
 
@@ -61,6 +61,11 @@ valid =
     True
 
 
+validToCell : Table -> Move -> Cell -> Bool
+validToCell table move cell =
+    Table.cellEmpty cell table && Move.isOneCard move
+
+
 endMove : Maybe TableLoc -> Game -> Game
 endMove mTableLoc game =
     case game.state of
@@ -76,6 +81,13 @@ endMove mTableLoc game =
                                 TableCascade column ->
                                     if valid then
                                         Move.toColumn column game.table move
+
+                                    else
+                                        move
+
+                                TableCell cell ->
+                                    if validToCell game.table move cell then
+                                        Move.toCell cell move
 
                                     else
                                         move

@@ -3,7 +3,7 @@ module Move exposing (..)
 import Array
 import Card exposing (Card)
 import Position exposing (Position)
-import Table exposing (CardLoc(..), Column, Table)
+import Table exposing (CardLoc(..), Cell, Column, Table)
 import Table.View
 
 
@@ -57,6 +57,11 @@ getPile (Move { pile }) =
     pile
 
 
+isOneCard : Move -> Bool
+isOneCard (Move { pile }) =
+    List.length pile == 1
+
+
 finalize : Table -> Move -> Table
 finalize table (Move move) =
     case move.to of
@@ -92,6 +97,24 @@ finalize table (Move move) =
         Hand _ ->
             table
 
+        CellLoc cell ->
+            case move.pile of
+                [] ->
+                    table
+
+                [ card ] ->
+                    let
+                        updatedCard =
+                            { card | position = Table.View.positionFor move.to }
+
+                        updatedCells =
+                            Array.set cell (Just updatedCard) table.cells
+                    in
+                    { table | cells = updatedCells }
+
+                _ ->
+                    table
+
 
 toColumn : Column -> Table -> Move -> Move
 toColumn column table (Move move) =
@@ -105,3 +128,8 @@ toColumn column table (Move move) =
             List.length cascade
     in
     Move { move | to = CascadeLoc column moveRow }
+
+
+toCell : Cell -> Move -> Move
+toCell cell (Move move) =
+    Move { move | to = CellLoc cell }

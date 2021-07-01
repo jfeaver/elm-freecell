@@ -15,7 +15,7 @@ import Html.Styled.Events exposing (onClick)
 import Move
 import Position
 import Random
-import Table exposing (CardLoc(..), Column, Table)
+import Table exposing (CardLoc(..), Cell, Column, Table)
 import Table.View
 import Task
 
@@ -176,17 +176,17 @@ header =
         ]
 
 
-cell : ( Int, Maybe Card ) -> Html Msg
-cell ( n, maybeCard ) =
+cell : ( Cell, Maybe Card ) -> Html Msg
+cell ( cellN, maybeCard ) =
     maybeCard
-        |> Maybe.map (\card -> div [] [])
+        |> Maybe.map (\card -> cardView (CellLoc cellN) card)
         |> Maybe.withDefault
             (div
                 [ Table.View.cardMark
                 , css
                     [ position absolute
-                    , top (px 40)
-                    , left (px (30 + (Card.View.width + Table.View.padding) * toFloat n))
+                    , top (px Table.View.topOffset)
+                    , left (px (Table.View.horizontalOffset + (Card.View.width + Table.View.padding) * toFloat cellN))
                     ]
                 ]
                 []
@@ -195,7 +195,10 @@ cell ( n, maybeCard ) =
 
 cells : Table -> Html Msg
 cells table =
-    table.cells |> Array.toIndexedList |> List.map cell |> div []
+    table.cells
+        |> Array.toIndexedList
+        |> List.map cell
+        |> div []
 
 
 foundations : Table -> Html Msg
@@ -210,8 +213,8 @@ foundations table =
         positioning n =
             css
                 [ position absolute
-                , top (px 40)
-                , right (px (30 + (Card.View.width + Table.View.padding) * toFloat n))
+                , top (px Table.View.topOffset)
+                , right (px (Table.View.horizontalOffset + (Card.View.width + Table.View.padding) * toFloat n))
                 ]
 
         cardIcon filepath =
