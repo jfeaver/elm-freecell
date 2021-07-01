@@ -13,7 +13,7 @@ import Html.Styled.Attributes exposing (css)
 import Html.Styled.Events exposing (onClick)
 import Move
 import Random
-import Table exposing (CardLoc(..), Table)
+import Table exposing (CardLoc(..), Column, Row, Table)
 import Table.View
 
 
@@ -213,19 +213,19 @@ foundations table =
         ]
 
 
-cascade : ( Int, List Card ) -> Html Msg
-cascade ( n, cards ) =
+cascade : ( Column, List Card ) -> Html Msg
+cascade ( column, cards ) =
     div []
         (div
             [ css
                 [ position absolute
                 , top (px Table.View.cascadesTop)
-                , left (px (Table.View.cascadesOffset + toFloat n * (Card.View.width + Table.View.padding)))
+                , left (px (Table.View.cascadesOffset + toFloat column * (Card.View.width + Table.View.padding)))
                 ]
             , Table.View.cardMark
             ]
             []
-            :: List.indexedMap (cascadeCardView n) cards
+            :: List.indexedMap (cascadeCardView (List.length cards) column) cards
         )
 
 
@@ -234,8 +234,12 @@ cascades table =
     table.cascades |> Array.toIndexedList |> List.map cascade |> div []
 
 
-cascadeCardView : Int -> Int -> Card -> Html Msg
-cascadeCardView column row =
+cascadeCardView : Int -> Column -> Int -> Card -> Html Msg
+cascadeCardView columnDepth column inversedRow =
+    let
+        row =
+            (columnDepth - 1) - inversedRow
+    in
     cardView (CascadeLoc column row)
 
 

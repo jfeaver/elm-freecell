@@ -72,13 +72,13 @@ reverse table (Move move) =
                         | position =
                             move.from
                                 |> Table.View.positionFor
-                                |> Position.add ( 0, toFloat (List.length columnStillInPlace + pileDepth - depth - 1) * Table.View.pileSpacing )
-                        , zIndex = Table.View.zIndexFor move.from + pileDepth - depth - 1
+                                |> Position.add ( 0, toFloat (List.length columnStillInPlace + pileDepth - depth) * Table.View.pileSpacing )
+                        , zIndex = Table.View.zIndexFor move.from + pileDepth - depth
                     }
 
                 repositionedMovePile =
                     move.pile
-                        |> List.indexedMap (repositionCard (List.length move.pile))
+                        |> List.indexedMap (repositionCard (List.length move.pile - 1))
 
                 resetColumn =
                     List.concat [ columnStillInPlace, repositionedMovePile ]
