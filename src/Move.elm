@@ -1,4 +1,4 @@
-module Move exposing (..)
+module Move exposing (Move, color, finalize, getPile, isOneCard, new, rank, toCell, toColumn, update)
 
 import Array
 import Card exposing (Card, Rank(..))

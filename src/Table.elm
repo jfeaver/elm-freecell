@@ -1,7 +1,9 @@
-module Table exposing (..)
+module Table exposing (CardLoc(..), Cell, Column, Depth, Row, Table, cascadesCount, cellEmpty, cellsCount, new, pickPile, validPile)
 
 import Array exposing (Array)
 import Card exposing (Card)
+import Card.Color
+import Card.Rank
 import List.Extra
 import Maybe.Extra
 
@@ -75,7 +77,22 @@ new =
     }
 
 
-pickPile : CardLoc -> Table -> ( List Card, Table )
+validPilePair : Card -> Card -> Bool
+validPilePair top second =
+    Card.Rank.increment top.rank == second.rank && Card.Color.notColor (Card.Color.fromCard top) == Card.Color.fromCard second
+
+
+validPile : List Card -> Bool
+validPile cards =
+    case cards of
+        top :: second :: others ->
+            validPilePair top second && validPile (second :: others)
+
+        _ ->
+            True
+
+
+pickPile : CardLoc -> Table -> Maybe ( List Card, Table )
 pickPile cardLoc table =
     case cardLoc of
         CascadeLoc column row ->
@@ -87,32 +104,40 @@ pickPile cardLoc table =
                     in
                     List.Extra.partitionN (columnDepth - row) columnCards
 
-                ( pile, leftBehind ) =
+                validatePileMapper ( pile, leftBehind ) =
+                    case validPile pile of
+                        True ->
+                            Just ( pile, leftBehind )
+
+                        False ->
+                            Nothing
+
+                mDividedPiles : Maybe ( List Card, List Card )
+                mDividedPiles =
+                    -- Maybe (pile, leftBehind)
                     -- TODO : Cascades should be its own type so that I don't have to add the default always
                     table.cascades
                         |> Array.get column
                         |> Maybe.withDefault []
                         |> takeTopN
-
-                updatedTable =
-                    { table | cascades = Array.set column leftBehind table.cascades }
+                        |> validatePileMapper
             in
-            ( pile, updatedTable )
-
-        Hand _ ->
-            ( [], table )
-
-        CellLoc cell ->
-            case getCell cell table of
-                Just card ->
-                    let
-                        updatedCells =
-                            Array.set cell Nothing table.cells
-                    in
-                    ( [ card ], { table | cells = updatedCells } )
+            case mDividedPiles of
+                Just ( pile, leftBehind ) ->
+                    Just ( pile, { table | cascades = Array.set column leftBehind table.cascades } )
 
                 Nothing ->
-                    ( [], table )
+                    Nothing
+
+        Hand _ ->
+            Nothing
+
+        CellLoc cell ->
+            let
+                hasCardMapper card =
+                    ( [ card ], { table | cells = Array.set cell Nothing table.cells } )
+            in
+            Maybe.map hasCardMapper (getCell cell table)
 
 
 getCell : Cell -> Table -> Maybe Card

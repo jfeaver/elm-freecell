@@ -36,13 +36,18 @@ startMove cardLoc card position game =
     case game.state of
         Ready ->
             let
-                ( pile, table ) =
+                mDivided =
                     Table.pickPile cardLoc game.table
 
-                move =
+                move pile =
                     Move.new cardLoc card pile position
             in
-            Game table (PlayerMove move)
+            case mDivided of
+                Just ( pile, table ) ->
+                    Game table (PlayerMove <| move pile)
+
+                Nothing ->
+                    game
 
         PlayerMove _ ->
             game
