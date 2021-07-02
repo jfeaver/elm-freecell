@@ -2,10 +2,12 @@ module Game exposing (..)
 
 import Array
 import Card exposing (Card)
+import Card.Color
+import Card.Rank
 import Deck exposing (Deck)
 import Move exposing (Move)
 import Position exposing (Position)
-import Table exposing (CardLoc, Cell, Table)
+import Table exposing (CardLoc, Cell, Column, Table)
 import Table.View exposing (TableLoc(..))
 
 
@@ -56,9 +58,43 @@ updateMove position game =
             { game | state = PlayerMove (Move.update position lastMove) }
 
 
-valid : Bool
-valid =
-    True
+validToCascade : Table -> Move -> Column -> Bool
+validToCascade table move column =
+    let
+        cascade =
+            table.cascades
+                |> Array.get column
+                |> Maybe.withDefault []
+
+        moveColor =
+            Move.color move
+
+        mCascadeColor =
+            cascade
+                |> Card.Color.fromPile
+
+        mCascadeRank =
+            case cascade of
+                [] ->
+                    Nothing
+
+                head :: _ ->
+                    Just head.rank
+
+        moveRank =
+            Move.rank move
+    in
+    case mCascadeColor of
+        Just cascadeColor ->
+            case mCascadeRank of
+                Just cascadeRank ->
+                    (Card.Color.notColor moveColor == cascadeColor) && (Card.Rank.increment moveRank == cascadeRank)
+
+                Nothing ->
+                    True
+
+        Nothing ->
+            True
 
 
 validToCell : Table -> Move -> Cell -> Bool
@@ -79,7 +115,7 @@ endMove mTableLoc game =
                         Just tableLoc ->
                             case tableLoc of
                                 TableCascade column ->
-                                    if valid then
+                                    if validToCascade game.table move column then
                                         Move.toColumn column game.table move
 
                                     else

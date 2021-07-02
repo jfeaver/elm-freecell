@@ -1,7 +1,9 @@
 module Move exposing (..)
 
 import Array
-import Card exposing (Card)
+import Card exposing (Card, Rank(..))
+import Card.Color exposing (CardColor(..))
+import Card.Rank
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Cell, Column, Table)
 import Table.View
@@ -133,3 +135,25 @@ toColumn column table (Move move) =
 toCell : Cell -> Move -> Move
 toCell cell (Move move) =
     Move { move | to = CellLoc cell }
+
+
+color : Move -> CardColor
+color (Move { pile }) =
+    case Card.Color.fromPileTop pile of
+        Just theColor ->
+            theColor
+
+        Nothing ->
+            -- shouldn't happen
+            Black
+
+
+rank : Move -> Rank
+rank (Move { pile }) =
+    case pile of
+        card :: _ ->
+            Card.Rank.incrementN (List.length pile - 1) card.rank
+
+        [] ->
+            -- shouldn't happen
+            King
