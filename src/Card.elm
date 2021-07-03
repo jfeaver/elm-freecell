@@ -40,6 +40,17 @@ type alias CardPrototype =
     }
 
 
-isCard : CardPrototype -> Card -> Bool
-isCard { suit, rank } card =
-    card.suit == suit && card.rank == rank
+suitIndex : Suit -> Int
+suitIndex suit =
+    case suit of
+        Diamonds ->
+            0
+
+        Clubs ->
+            1
+
+        Hearts ->
+            2
+
+        Spades ->
+            3

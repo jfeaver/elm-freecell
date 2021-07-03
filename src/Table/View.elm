@@ -1,7 +1,7 @@
 module Table.View exposing (..)
 
 import Array exposing (Array)
-import Card exposing (Card)
+import Card exposing (Card, Suit(..))
 import Card.View
 import Css exposing (border3, borderRadius, hex, px, solid)
 import Deck exposing (Deck)
@@ -15,6 +15,7 @@ import Table exposing (CardLoc(..), Cell, Column, Depth, Row, cascadesCount, cel
 type TableLoc
     = TableCascade Column
     | TableCell Cell
+    | TableFoundation Suit
 
 
 width : Float
@@ -113,6 +114,13 @@ positionFor cardLoc =
         CellLoc cell ->
             ( horizontalOffset + toFloat cell * (Card.View.width + padding), topOffset )
 
+        FoundationLoc suit ->
+            let
+                invertedSuitIndex =
+                    4 - Card.suitIndex suit
+            in
+            ( width - (horizontalOffset + toFloat invertedSuitIndex * Card.View.width + toFloat (invertedSuitIndex - 1) * padding), topOffset )
+
 
 cascadesLocFor : Position -> Maybe TableLoc
 cascadesLocFor ( left, top ) =
@@ -164,9 +172,50 @@ cellsLocFor ( left, top ) =
         Just <| TableCell (floor (leftCells / (Card.View.width + padding)))
 
 
+foundationLocFor : Position -> Maybe TableLoc
+foundationLocFor ( left, top ) =
+    let
+        rightFoundationsOffset =
+            width - horizontalOffset + halfPadding
+
+        leftFoundationsOffset =
+            rightFoundationsOffset - 4 * cardBoxWidth
+
+        cardBoxWidth =
+            Card.View.width + padding
+
+        topFoundationsOffset =
+            topOffset - halfPadding
+
+        leftFoundations =
+            left - leftFoundationsOffset
+
+        topFoundations =
+            top - topFoundationsOffset
+
+        maxTop =
+            Card.View.height + padding
+    in
+    if leftFoundations > 0 && leftFoundations < cardBoxWidth && topFoundations > 0 && topFoundations < maxTop then
+        Just (TableFoundation Diamonds)
+
+    else if leftFoundations > cardBoxWidth && leftFoundations < 2 * cardBoxWidth && topFoundations > 0 && topFoundations < maxTop then
+        Just (TableFoundation Clubs)
+
+    else if leftFoundations > 2 * cardBoxWidth && leftFoundations < 3 * cardBoxWidth && topFoundations > 0 && topFoundations < maxTop then
+        Just (TableFoundation Hearts)
+
+    else if leftFoundations > 3 * cardBoxWidth && leftFoundations < 4 * cardBoxWidth && topFoundations > 0 && topFoundations < maxTop then
+        Just (TableFoundation Spades)
+
+    else
+        Nothing
+
+
 locFor : Position -> Maybe TableLoc
 locFor position =
     Maybe.Extra.or (cascadesLocFor position) (cellsLocFor position)
+        |> Maybe.Extra.or (foundationLocFor position)
 
 
 recursiveDeal : Row -> Column -> Array (List Card) -> Deck -> Array (List Card)
@@ -216,3 +265,7 @@ zIndexFor cardLoc =
 
         CellLoc _ ->
             1
+
+        FoundationLoc _ ->
+            -- Top card is two, decrement card is one
+            2

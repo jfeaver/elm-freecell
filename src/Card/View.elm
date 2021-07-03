@@ -3,8 +3,8 @@ module Card.View exposing (..)
 import Card exposing (Card, Rank(..), Suit(..))
 
 
-rankName : Card -> String
-rankName { rank } =
+rankName : Rank -> String
+rankName rank =
     case rank of
         Ace ->
             "A"
@@ -46,8 +46,8 @@ rankName { rank } =
             "K"
 
 
-suitName : Card -> String
-suitName { suit } =
+suitName : Suit -> String
+suitName suit =
     case suit of
         Diamonds ->
             "diamond"
@@ -64,7 +64,7 @@ suitName { suit } =
 
 filename : Card -> String
 filename card =
-    "assets/Playing_card_" ++ suitName card ++ "_" ++ rankName card ++ ".svg"
+    "assets/Playing_card_" ++ suitName card.suit ++ "_" ++ rankName card.rank ++ ".svg"
 
 
 width : Float
@@ -80,3 +80,8 @@ aspectRatio =
 height : Float
 height =
     width * aspectRatio
+
+
+suitIconSrc : Suit -> String
+suitIconSrc suit =
+    "assets/" ++ suitName suit ++ ".svg"

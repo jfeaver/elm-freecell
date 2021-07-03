@@ -1,7 +1,7 @@
-module Move exposing (Move, color, finalize, getPile, isOneCard, new, rank, toCell, toColumn, update)
+module Move exposing (Move, color, finalize, getPile, isOneCard, new, rank, showingSuit, toCascade, toCell, toFoundation, update)
 
 import Array
-import Card exposing (Card, Rank(..))
+import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color exposing (CardColor(..))
 import Card.Rank
 import Position exposing (Position)
@@ -64,8 +64,17 @@ isOneCard (Move { pile }) =
     List.length pile == 1
 
 
+{-| Position the card, apply correct z index, and update the table
+-}
 finalize : Table -> Move -> Table
 finalize table (Move move) =
+    let
+        updatedZIndex =
+            Table.View.zIndexFor move.to
+
+        updatedPosition =
+            Table.View.positionFor move.to
+    in
     case move.to of
         CascadeLoc column _ ->
             let
@@ -77,10 +86,9 @@ finalize table (Move move) =
                 positionCard pileDepth depth card =
                     { card
                         | position =
-                            move.to
-                                |> Table.View.positionFor
+                            updatedPosition
                                 |> Position.add ( 0, Table.View.pileDepthOffset (pileDepth - depth) )
-                        , zIndex = Table.View.zIndexFor move.to + pileDepth - depth
+                        , zIndex = updatedZIndex + pileDepth - depth
                     }
 
                 positionedMovePile =
@@ -101,13 +109,10 @@ finalize table (Move move) =
 
         CellLoc cell ->
             case move.pile of
-                [] ->
-                    table
-
                 [ card ] ->
                     let
                         updatedCard =
-                            { card | position = Table.View.positionFor move.to }
+                            { card | position = updatedPosition, zIndex = updatedZIndex }
 
                         updatedCells =
                             Array.set cell (Just updatedCard) table.cells
@@ -117,9 +122,28 @@ finalize table (Move move) =
                 _ ->
                     table
 
+        FoundationLoc suit ->
+            case move.pile of
+                [ card ] ->
+                    case suit of
+                        Diamonds ->
+                            { table | diamonds = Just { card | position = updatedPosition, zIndex = updatedZIndex } }
 
-toColumn : Column -> Table -> Move -> Move
-toColumn column table (Move move) =
+                        Clubs ->
+                            { table | clubs = Just { card | position = updatedPosition, zIndex = updatedZIndex } }
+
+                        Hearts ->
+                            { table | hearts = Just { card | position = updatedPosition, zIndex = updatedZIndex } }
+
+                        Spades ->
+                            { table | spades = Just { card | position = updatedPosition, zIndex = updatedZIndex } }
+
+                _ ->
+                    table
+
+
+toCascade : Column -> Table -> Move -> Move
+toCascade column table (Move move) =
     let
         cascade =
             table.cascades
@@ -135,6 +159,11 @@ toColumn column table (Move move) =
 toCell : Cell -> Move -> Move
 toCell cell (Move move) =
     Move { move | to = CellLoc cell }
+
+
+toFoundation : Suit -> Move -> Move
+toFoundation suit (Move move) =
+    Move { move | to = FoundationLoc suit }
 
 
 color : Move -> CardColor
@@ -157,3 +186,13 @@ rank (Move { pile }) =
         [] ->
             -- shouldn't happen
             King
+
+
+showingSuit : Move -> Maybe Suit
+showingSuit (Move move) =
+    case move.pile of
+        { suit } :: _ ->
+            Just suit
+
+        _ ->
+            Nothing

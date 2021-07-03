@@ -1,36 +1,24 @@
 module Table exposing (CardLoc(..), Cell, Column, Depth, Row, Table, cascadesCount, cellEmpty, cellsCount, new, pickPile, validPile)
 
 import Array exposing (Array)
-import Card exposing (Card)
+import Card exposing (Card, Suit(..))
 import Card.Color
 import Card.Rank
 import List.Extra
 import Maybe.Extra
 
 
-type alias FoundationD =
-    List Card
-
-
-type alias FoundationC =
-    List Card
-
-
-type alias FoundationH =
-    List Card
-
-
-type alias FoundationS =
-    List Card
+type alias Foundation =
+    Maybe Card
 
 
 type alias Table =
     { cells : Array (Maybe Card)
     , cascades : Array (List Card)
-    , foundationD : FoundationD
-    , foundationC : FoundationC
-    , foundationH : FoundationH
-    , foundationS : FoundationS
+    , diamonds : Foundation
+    , clubs : Foundation
+    , hearts : Foundation
+    , spades : Foundation
     }
 
 
@@ -54,6 +42,7 @@ type CardLoc
     = CascadeLoc Column Row
     | CellLoc Cell
     | Hand Depth
+    | FoundationLoc Suit
 
 
 cascadesCount : Int
@@ -70,10 +59,10 @@ new : Table
 new =
     { cells = Array.initialize cellsCount (always Nothing)
     , cascades = Array.empty
-    , foundationD = []
-    , foundationC = []
-    , foundationH = []
-    , foundationS = []
+    , diamonds = Nothing
+    , clubs = Nothing
+    , hearts = Nothing
+    , spades = Nothing
     }
 
 
@@ -138,6 +127,24 @@ pickPile cardLoc table =
                     ( [ card ], { table | cells = Array.set cell Nothing table.cells } )
             in
             Maybe.map hasCardMapper (getCell cell table)
+
+        FoundationLoc suit ->
+            case suit of
+                Diamonds ->
+                    table.diamonds
+                        |> Maybe.map (\card -> ( [ card ], { table | diamonds = Card.Rank.decrementCard card } ))
+
+                Clubs ->
+                    table.clubs
+                        |> Maybe.map (\card -> ( [ card ], { table | clubs = Card.Rank.decrementCard card } ))
+
+                Hearts ->
+                    table.hearts
+                        |> Maybe.map (\card -> ( [ card ], { table | hearts = Card.Rank.decrementCard card } ))
+
+                Spades ->
+                    table.spades
+                        |> Maybe.map (\card -> ( [ card ], { table | spades = Card.Rank.decrementCard card } ))
 
 
 getCell : Cell -> Table -> Maybe Card

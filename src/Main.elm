@@ -3,7 +3,7 @@ module Main exposing (..)
 import Array
 import Browser exposing (Document)
 import Browser.Dom exposing (Element)
-import Card exposing (Card)
+import Card exposing (Card, Rank(..), Suit(..))
 import Card.View
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck exposing (Deck)
@@ -201,8 +201,8 @@ cells table =
         |> div []
 
 
-foundations : Table -> Html Msg
-foundations table =
+foundation : Table -> (Table -> Maybe Card) -> Suit -> Html Msg
+foundation table fieldGetter suit =
     let
         suitIconWidth =
             0.53 * Card.View.width
@@ -229,19 +229,23 @@ foundations table =
                 , transform (translate2 (pct -50) (pct 50))
                 ]
     in
+    case fieldGetter table of
+        Just card ->
+            cardView (FoundationLoc suit) card
+
+        Nothing ->
+            div [ Table.View.cardMark, positioning (3 - Card.suitIndex suit) ]
+                [ div [ cardIcon (Card.View.suitIconSrc suit) ] []
+                ]
+
+
+foundations : Table -> Html Msg
+foundations table =
     div []
-        [ div [ Table.View.cardMark, positioning 3 ]
-            [ div [ cardIcon "assets/diamond.svg" ] []
-            ]
-        , div [ Table.View.cardMark, positioning 2 ]
-            [ div [ cardIcon "assets/club.svg" ] []
-            ]
-        , div [ Table.View.cardMark, positioning 1 ]
-            [ div [ cardIcon "assets/heart.svg" ] []
-            ]
-        , div [ Table.View.cardMark, positioning 0 ]
-            [ div [ cardIcon "assets/spade.svg" ] []
-            ]
+        [ foundation table .diamonds Diamonds
+        , foundation table .clubs Clubs
+        , foundation table .hearts Hearts
+        , foundation table .spades Spades
         ]
 
 

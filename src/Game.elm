@@ -1,7 +1,7 @@
 module Game exposing (..)
 
 import Array
-import Card exposing (Card)
+import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color
 import Card.Rank
 import Deck exposing (Deck)
@@ -63,6 +63,20 @@ updateMove position game =
             { game | state = PlayerMove (Move.update position lastMove) }
 
 
+{-| For moving onto cascades
+-}
+validDecrement : Move -> Card -> Bool
+validDecrement move card =
+    Card.Rank.increment (Move.rank move) == card.rank
+
+
+{-| For moving onto foundations
+-}
+validIncrement : Move -> Card -> Bool
+validIncrement move card =
+    Move.rank move == Card.Rank.increment card.rank
+
+
 validToCascade : Table -> Move -> Column -> Bool
 validToCascade table move column =
     let
@@ -78,22 +92,19 @@ validToCascade table move column =
             cascade
                 |> Card.Color.fromPile
 
-        mCascadeRank =
+        mCascadeCard =
             case cascade of
-                [] ->
-                    Nothing
-
                 head :: _ ->
-                    Just head.rank
+                    Just head
 
-        moveRank =
-            Move.rank move
+                _ ->
+                    Nothing
     in
     case mCascadeColor of
         Just cascadeColor ->
-            case mCascadeRank of
-                Just cascadeRank ->
-                    (Card.Color.notColor moveColor == cascadeColor) && (Card.Rank.increment moveRank == cascadeRank)
+            case mCascadeCard of
+                Just cascadeCard ->
+                    (Card.Color.notColor moveColor == cascadeColor) && validDecrement move cascadeCard
 
                 Nothing ->
                     True
@@ -105,6 +116,42 @@ validToCascade table move column =
 validToCell : Table -> Move -> Cell -> Bool
 validToCell table move cell =
     Table.cellEmpty cell table && Move.isOneCard move
+
+
+validToFoundation : Table -> Move -> Suit -> Bool
+validToFoundation table move suit =
+    let
+        suitMatches =
+            case Move.showingSuit move of
+                Just moveSuit ->
+                    moveSuit == suit
+
+                Nothing ->
+                    False
+
+        foundationCard =
+            case suit of
+                Diamonds ->
+                    table.diamonds
+
+                Clubs ->
+                    table.clubs
+
+                Hearts ->
+                    table.hearts
+
+                Spades ->
+                    table.spades
+
+        isIncrement =
+            case foundationCard of
+                Just card ->
+                    validIncrement move card
+
+                Nothing ->
+                    Move.rank move == Ace
+    in
+    Move.isOneCard move && suitMatches && isIncrement
 
 
 endMove : Maybe TableLoc -> Game -> Game
@@ -121,7 +168,7 @@ endMove mTableLoc game =
                             case tableLoc of
                                 TableCascade column ->
                                     if validToCascade game.table move column then
-                                        Move.toColumn column game.table move
+                                        Move.toCascade column game.table move
 
                                     else
                                         move
@@ -129,6 +176,13 @@ endMove mTableLoc game =
                                 TableCell cell ->
                                     if validToCell game.table move cell then
                                         Move.toCell cell move
+
+                                    else
+                                        move
+
+                                TableFoundation suit ->
+                                    if validToFoundation game.table move suit then
+                                        Move.toFoundation suit move
 
                                     else
                                         move
