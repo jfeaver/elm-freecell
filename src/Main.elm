@@ -155,7 +155,7 @@ body model =
                     , position relative
                     , margin auto
                     , width (px Table.View.width)
-                    , height (px Table.View.height)
+                    , height (px <| Table.View.height + Table.View.expandedPlayHeight game.table)
                     ]
                 , onMove MouseMove |> fromUnstyled
                 , onUp MouseUp |> fromUnstyled
@@ -322,8 +322,6 @@ activeMove state =
                     cardView (Hand depth)
 
                 cardsHtml =
-                    move
-                        |> Move.getPile
-                        |> List.indexedMap toCardView
+                    Move.indexedMap toCardView move
             in
             div [] cardsHtml

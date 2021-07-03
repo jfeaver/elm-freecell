@@ -2,7 +2,7 @@ module Move exposing
     ( Move
     , color
     , finalize
-    , getPile
+    , indexedMap
     , new
     , pileDepth
     , rank
@@ -67,11 +67,9 @@ update mousePosition (Move move) =
     Move { move | pile = updatedPile }
 
 
-{-| FIXME: I want to remove this
--}
-getPile : Move -> List Card
-getPile (Move { pile }) =
-    pile
+indexedMap : (Int -> Card -> a) -> Move -> List a
+indexedMap fn (Move { pile }) =
+    List.indexedMap fn pile
 
 
 pileDepth : Move -> Int

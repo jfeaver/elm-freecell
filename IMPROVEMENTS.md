@@ -7,4 +7,3 @@
 BUGZ
 * Can still move a large pile onto an empty cascade
 * Can move a large pile off of a cascade as if we were using its own cascade as an empty one
-* The bottom of the table doesn’t stretch for long cascades

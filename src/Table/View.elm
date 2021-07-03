@@ -64,6 +64,11 @@ halfPadding =
     padding / 2
 
 
+doublePadding : Float
+doublePadding =
+    padding * 2
+
+
 topOffset : Float
 topOffset =
     40
@@ -81,7 +86,7 @@ cascadesOffset table =
 
 cascadesTop : Float
 cascadesTop =
-    165
+    topOffset + Card.View.height + doublePadding
 
 
 pileSpacing : Float
@@ -269,3 +274,24 @@ zIndexFor cardLoc =
         FoundationLoc _ ->
             -- Top card is two, decrement card is one
             2
+
+
+{-| Returns number of pixels that play is extending beyond normal table height
+-}
+expandedPlayHeight : Table -> Float
+expandedPlayHeight table =
+    let
+        doLongestCascade cascade longest =
+            max (List.length cascade) longest
+
+        longestCascade =
+            Array.foldl doLongestCascade 0 table.cascades
+
+        playExtension =
+            cascadesTop + toFloat longestCascade * pileSpacing + doublePadding + Card.View.height - height
+    in
+    if playExtension > 0 then
+        playExtension
+
+    else
+        0
