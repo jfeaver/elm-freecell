@@ -107,13 +107,22 @@ validPileDepth cardLoc table pileDepth =
     pileDepth <= maxPileDepth algorithm table
 
 
-validPileDepthOnMoveToEmptyCascade : Table -> Int -> Bool
-validPileDepthOnMoveToEmptyCascade table pileDepth =
+{-| While moving to an empty cascade you can't consider it to be
+empty as an intermediate pile stacking zone. Additionally, if a
+full cascade is being moved then that can't count as an empty
+cascade either.
+-}
+validPileDepthOnMoveToEmptyCascade : Table -> Move -> Bool
+validPileDepthOnMoveToEmptyCascade table move =
     let
         algorithm emptyCascades emptyCells =
-            2 ^ (emptyCascades - 1) * (emptyCells + 1)
+            if Move.isFullCascade move then
+                2 ^ (emptyCascades - 2) * (emptyCells + 1)
+
+            else
+                2 ^ (emptyCascades - 1) * (emptyCells + 1)
     in
-    pileDepth <= maxPileDepth algorithm table
+    Move.pileDepth move <= maxPileDepth algorithm table
 
 
 {-| For moving onto cascades
@@ -141,10 +150,6 @@ validToCascade table move column =
         moveColor =
             Move.color move
 
-        mCascadeColor =
-            cascade
-                |> Card.Color.fromPile
-
         mCascadeCard =
             case cascade of
                 head :: _ ->
@@ -153,17 +158,12 @@ validToCascade table move column =
                 _ ->
                     Nothing
     in
-    case mCascadeColor of
-        Just cascadeColor ->
-            case mCascadeCard of
-                Just cascadeCard ->
-                    (Card.Color.notColor moveColor == cascadeColor) && validDecrement move cascadeCard
-
-                Nothing ->
-                    validPileDepthOnMoveToEmptyCascade table (Move.pileDepth move)
+    case mCascadeCard of
+        Just cascadeCard ->
+            (Card.Color.notColor moveColor == Card.Color.fromCard cascadeCard) && validDecrement move cascadeCard
 
         Nothing ->
-            True
+            validPileDepthOnMoveToEmptyCascade table move
 
 
 validToCell : Table -> Move -> Cell -> Bool

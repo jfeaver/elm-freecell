@@ -3,6 +3,7 @@ module Move exposing
     , color
     , finalize
     , indexedMap
+    , isFullCascade
     , new
     , pileDepth
     , rank
@@ -209,3 +210,13 @@ showingSuit (Move move) =
 
         _ ->
             Nothing
+
+
+isFullCascade : Move -> Bool
+isFullCascade (Move move) =
+    case move.from of
+        CascadeLoc _ row ->
+            row == 0
+
+        _ ->
+            False

@@ -1,4 +1,9 @@
-module Card.Color exposing (..)
+module Card.Color exposing
+    ( CardColor(..)
+    , fromCard
+    , fromPileTop
+    , notColor
+    )
 
 import Card exposing (Card, Suit(..))
 
