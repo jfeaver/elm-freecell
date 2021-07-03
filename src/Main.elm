@@ -122,7 +122,7 @@ update msg model =
                                     Position.diff tablePosition event.clientPos
 
                                 mLastCardLoc =
-                                    Table.View.locFor mouseUpTablePosition
+                                    Table.View.locFor game.table mouseUpTablePosition
 
                                 updatedGame =
                                     Game.endMove mLastCardLoc game
@@ -249,14 +249,14 @@ foundations table =
         ]
 
 
-cascade : ( Column, List Card ) -> Html Msg
-cascade ( column, cards ) =
+cascade : Float -> ( Column, List Card ) -> Html Msg
+cascade cascadesOffset ( column, cards ) =
     div []
         (div
             [ css
                 [ position absolute
                 , top (px Table.View.cascadesTop)
-                , left (px (Table.View.cascadesOffset + toFloat column * (Card.View.width + Table.View.padding)))
+                , left (px (cascadesOffset + toFloat column * (Card.View.width + Table.View.padding)))
                 ]
             , Table.View.cardMark
             ]
@@ -267,7 +267,7 @@ cascade ( column, cards ) =
 
 cascades : Table -> Html Msg
 cascades table =
-    table.cascades |> Array.toIndexedList |> List.map cascade |> div []
+    table.cascades |> Array.toIndexedList |> List.map (cascade <| Table.View.cascadesOffset table) |> div []
 
 
 cascadeCardView : Int -> Column -> Int -> Card -> Html Msg

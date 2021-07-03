@@ -88,7 +88,7 @@ finalize table (Move move) =
             Table.View.zIndexFor move.to
 
         updatedPosition =
-            Table.View.positionFor move.to
+            Table.View.positionFor table move.to
     in
     case move.to of
         CascadeLoc column _ ->

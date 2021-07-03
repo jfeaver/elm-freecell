@@ -33,9 +33,9 @@ new : Deck -> Game
 new deck =
     let
         table =
-            Table.new
+            Table.new 4 8
     in
-    Game { table | cascades = Table.View.deal deck } Ready
+    Game { table | cascades = Table.View.deal table deck } Ready
 
 
 startMove : CardLoc -> Card -> Position -> Game -> Game

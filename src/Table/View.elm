@@ -9,7 +9,7 @@ import Html.Styled exposing (Attribute)
 import Html.Styled.Attributes exposing (css)
 import Maybe.Extra
 import Position exposing (Position)
-import Table exposing (CardLoc(..), Cell, Column, Depth, Row, cascadesCount, cellsCount)
+import Table exposing (CardLoc(..), Cell, Column, Depth, Row, Table)
 
 
 type TableLoc
@@ -74,9 +74,9 @@ horizontalOffset =
     30
 
 
-cascadesOffset : Float
-cascadesOffset =
-    (width - toFloat cascadesCount * (Card.View.width + padding)) / 2
+cascadesOffset : Table -> Float
+cascadesOffset table =
+    (width - toFloat table.cascadesCount * (Card.View.width + padding)) / 2
 
 
 cascadesTop : Float
@@ -95,13 +95,13 @@ pileDepthOffset depth =
     toFloat depth * pileSpacing
 
 
-positionFor : CardLoc -> Position
-positionFor cardLoc =
+positionFor : Table -> CardLoc -> Position
+positionFor table cardLoc =
     case cardLoc of
         CascadeLoc column row ->
             let
                 left =
-                    cascadesOffset + toFloat column * (Card.View.width + padding)
+                    cascadesOffset table + toFloat column * (Card.View.width + padding)
 
                 top =
                     cascadesTop + toFloat row * pileSpacing
@@ -122,11 +122,11 @@ positionFor cardLoc =
             ( width - (horizontalOffset + toFloat invertedSuitIndex * Card.View.width + toFloat (invertedSuitIndex - 1) * padding), topOffset )
 
 
-cascadesLocFor : Position -> Maybe TableLoc
-cascadesLocFor ( left, top ) =
+cascadesLocFor : Table -> Position -> Maybe TableLoc
+cascadesLocFor table ( left, top ) =
     let
         leftCascadesOffset =
-            cascadesOffset - halfPadding
+            cascadesOffset table - halfPadding
 
         topCascadesOffset =
             cascadesTop - halfPadding
@@ -144,8 +144,8 @@ cascadesLocFor ( left, top ) =
         Just <| TableCascade (floor (leftCascades / (Card.View.width + padding)))
 
 
-cellsLocFor : Position -> Maybe TableLoc
-cellsLocFor ( left, top ) =
+cellsLocFor : Table -> Position -> Maybe TableLoc
+cellsLocFor table ( left, top ) =
     let
         leftCellsOffset =
             horizontalOffset - halfPadding
@@ -160,7 +160,7 @@ cellsLocFor ( left, top ) =
             top - topCellsOffset
 
         maxLeft =
-            toFloat cellsCount * (Card.View.width + padding)
+            toFloat table.cellsCount * (Card.View.width + padding)
 
         maxTop =
             Card.View.height + padding
@@ -212,16 +212,16 @@ foundationLocFor ( left, top ) =
         Nothing
 
 
-locFor : Position -> Maybe TableLoc
-locFor position =
-    Maybe.Extra.or (cascadesLocFor position) (cellsLocFor position)
+locFor : Table -> Position -> Maybe TableLoc
+locFor table position =
+    Maybe.Extra.or (cascadesLocFor table position) (cellsLocFor table position)
         |> Maybe.Extra.or (foundationLocFor position)
 
 
-recursiveDeal : Row -> Column -> Array (List Card) -> Deck -> Array (List Card)
-recursiveDeal row column cascades deck =
-    if column == cascadesCount then
-        recursiveDeal (row + 1) 0 cascades deck
+recursiveDeal : Table -> Row -> Column -> Array (List Card) -> Deck -> Array (List Card)
+recursiveDeal table row column cascades deck =
+    if column == table.cascadesCount then
+        recursiveDeal table (row + 1) 0 cascades deck
 
     else
         let
@@ -235,7 +235,7 @@ recursiveDeal row column cascades deck =
                         CascadeLoc column row
 
                     positionedCard =
-                        { card | position = positionFor cardLoc, zIndex = zIndexFor cardLoc }
+                        { card | position = positionFor table cardLoc, zIndex = zIndexFor cardLoc }
 
                     cascade =
                         Array.get column cascades |> Maybe.withDefault []
@@ -243,15 +243,15 @@ recursiveDeal row column cascades deck =
                     updatedCascades =
                         Array.set column (positionedCard :: cascade) cascades
                 in
-                recursiveDeal row (column + 1) updatedCascades restDeck
+                recursiveDeal table row (column + 1) updatedCascades restDeck
 
             Nothing ->
                 cascades
 
 
-deal : Deck -> Array (List Card)
-deal deck =
-    recursiveDeal 0 0 (Array.initialize cascadesCount (always [])) deck
+deal : Table -> Deck -> Array (List Card)
+deal table deck =
+    recursiveDeal table 0 0 table.cascades deck
 
 
 zIndexFor : CardLoc -> Int

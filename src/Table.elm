@@ -5,9 +5,7 @@ module Table exposing
     , Depth
     , Row
     , Table
-    , cascadesCount
     , cellEmpty
-    , cellsCount
     , emptyCascades
     , emptyCells
     , new
@@ -29,7 +27,9 @@ type alias Foundation =
 
 type alias Table =
     { cells : Array (Maybe Card)
+    , cellsCount : Int
     , cascades : Array (List Card)
+    , cascadesCount : Int
     , diamonds : Foundation
     , clubs : Foundation
     , hearts : Foundation
@@ -60,20 +60,12 @@ type CardLoc
     | FoundationLoc Suit
 
 
-cascadesCount : Int
-cascadesCount =
-    8
-
-
-cellsCount : Int
-cellsCount =
-    4
-
-
-new : Table
-new =
+new : Int -> Int -> Table
+new cellsCount cascadesCount =
     { cells = Array.initialize cellsCount (always Nothing)
-    , cascades = Array.empty
+    , cellsCount = cellsCount
+    , cascades = Array.initialize cascadesCount (always [])
+    , cascadesCount = cascadesCount
     , diamonds = Nothing
     , clubs = Nothing
     , hearts = Nothing
@@ -176,7 +168,7 @@ cellEmpty cell table =
 
 countEmptyCascades : Column -> Int -> Table -> Int
 countEmptyCascades column count table =
-    if column == cascadesCount then
+    if column == table.cascadesCount then
         count
 
     else
@@ -202,7 +194,7 @@ emptyCascades =
 
 countEmptyCells : Cell -> Int -> Table -> Int
 countEmptyCells cell count table =
-    if cell == cellsCount then
+    if cell == table.cellsCount then
         count
 
     else
