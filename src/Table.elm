@@ -1,4 +1,19 @@
-module Table exposing (CardLoc(..), Cell, Column, Depth, Row, Table, cascadesCount, cellEmpty, cellsCount, new, pickPile, validPile)
+module Table exposing
+    ( CardLoc(..)
+    , Cell
+    , Column
+    , Depth
+    , Row
+    , Table
+    , cascadesCount
+    , cellEmpty
+    , cellsCount
+    , emptyCascades
+    , emptyCells
+    , new
+    , pickPile
+    , validPile
+    )
 
 import Array exposing (Array)
 import Card exposing (Card, Suit(..))
@@ -157,3 +172,56 @@ cellEmpty : Cell -> Table -> Bool
 cellEmpty cell table =
     getCell cell table
         |> Maybe.Extra.isNothing
+
+
+countEmptyCascades : Column -> Int -> Table -> Int
+countEmptyCascades column count table =
+    if column == cascadesCount then
+        count
+
+    else
+        let
+            cascade =
+                Array.get column table.cascades
+                    |> Maybe.withDefault []
+
+            newCount =
+                if List.length cascade == 0 then
+                    count + 1
+
+                else
+                    count
+        in
+        countEmptyCascades (column + 1) newCount table
+
+
+emptyCascades : Table -> Int
+emptyCascades =
+    countEmptyCascades 0 0
+
+
+countEmptyCells : Cell -> Int -> Table -> Int
+countEmptyCells cell count table =
+    if cell == cellsCount then
+        count
+
+    else
+        let
+            mCard =
+                Array.get cell table.cells
+                    |> Maybe.Extra.dig
+
+            newCount =
+                case mCard of
+                    Just _ ->
+                        count
+
+                    Nothing ->
+                        count + 1
+        in
+        countEmptyCells (cell + 1) newCount table
+
+
+emptyCells : Table -> Int
+emptyCells =
+    countEmptyCells 0 0

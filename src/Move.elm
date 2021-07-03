@@ -1,4 +1,17 @@
-module Move exposing (Move, color, finalize, getPile, isOneCard, new, rank, showingSuit, toCascade, toCell, toFoundation, update)
+module Move exposing
+    ( Move
+    , color
+    , finalize
+    , getPile
+    , new
+    , pileDepth
+    , rank
+    , showingSuit
+    , toCascade
+    , toCell
+    , toFoundation
+    , update
+    )
 
 import Array
 import Card exposing (Card, Rank(..), Suit(..))
@@ -40,28 +53,30 @@ update mousePosition (Move move) =
         positionDiff =
             Position.diff move.mouseStart mousePosition
 
-        updateCardPosition pileDepth depth card =
+        updateCardPosition depth card =
             { card
                 | position =
                     positionDiff
                         |> Position.add move.topCardStart
-                        |> Position.add ( 0, Table.View.pileDepthOffset (pileDepth - depth) )
+                        |> Position.add ( 0, Table.View.pileDepthOffset (pileDepth (Move move) - depth - 1) )
             }
 
         updatedPile =
-            List.indexedMap (updateCardPosition <| List.length move.pile - 1) move.pile
+            List.indexedMap updateCardPosition move.pile
     in
     Move { move | pile = updatedPile }
 
 
+{-| FIXME: I want to remove this
+-}
 getPile : Move -> List Card
 getPile (Move { pile }) =
     pile
 
 
-isOneCard : Move -> Bool
-isOneCard (Move { pile }) =
-    List.length pile == 1
+pileDepth : Move -> Int
+pileDepth (Move { pile }) =
+    List.length pile
 
 
 {-| Position the card, apply correct z index, and update the table
@@ -83,17 +98,17 @@ finalize table (Move move) =
                         |> Array.get column
                         |> Maybe.withDefault []
 
-                positionCard pileDepth depth card =
+                positionCard depth card =
                     { card
                         | position =
                             updatedPosition
-                                |> Position.add ( 0, Table.View.pileDepthOffset (pileDepth - depth) )
-                        , zIndex = updatedZIndex + pileDepth - depth
+                                |> Position.add ( 0, Table.View.pileDepthOffset (pileDepth (Move move) - depth - 1) )
+                        , zIndex = updatedZIndex + pileDepth (Move move) - depth - 1
                     }
 
                 positionedMovePile =
                     move.pile
-                        |> List.indexedMap (positionCard (List.length move.pile - 1))
+                        |> List.indexedMap positionCard
 
                 buildColumn =
                     -- This could be done card by card in positionedMovePile/positionCard

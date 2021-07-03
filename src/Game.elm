@@ -1,4 +1,11 @@
-module Game exposing (..)
+module Game exposing
+    ( Game
+    , State(..)
+    , endMove
+    , new
+    , startMove
+    , updateMove
+    )
 
 import Array
 import Card exposing (Card, Rank(..), Suit(..))
@@ -44,7 +51,11 @@ startMove cardLoc card position game =
             in
             case mDivided of
                 Just ( pile, table ) ->
-                    Game table (PlayerMove <| move pile)
+                    if validPileDepth table (List.length pile) then
+                        Game table (PlayerMove <| move pile)
+
+                    else
+                        game
 
                 Nothing ->
                     game
@@ -61,6 +72,38 @@ updateMove position game =
 
         PlayerMove lastMove ->
             { game | state = PlayerMove (Move.update position lastMove) }
+
+
+{-| The max function takes the number of empty cascades and then the number of empty cells and returns the maximum depth you can move
+-}
+maxPileDepth : (Int -> Int -> Int) -> Table -> Int
+maxPileDepth maxFn table =
+    let
+        emptyCascades =
+            Table.emptyCascades table
+
+        emptyCells =
+            Table.emptyCells table
+    in
+    maxFn emptyCascades emptyCells
+
+
+validPileDepth : Table -> Int -> Bool
+validPileDepth table pileDepth =
+    let
+        algorithm emptyCascades emptyCells =
+            2 ^ emptyCascades * (emptyCells + 1)
+    in
+    pileDepth <= maxPileDepth algorithm table
+
+
+validPileDepthOnMoveToEmptyCascade : Table -> Int -> Bool
+validPileDepthOnMoveToEmptyCascade table pileDepth =
+    let
+        algorithm emptyCascades emptyCells =
+            2 ^ (emptyCascades - 1) * (emptyCells + 1)
+    in
+    pileDepth <= maxPileDepth algorithm table
 
 
 {-| For moving onto cascades
@@ -107,7 +150,7 @@ validToCascade table move column =
                     (Card.Color.notColor moveColor == cascadeColor) && validDecrement move cascadeCard
 
                 Nothing ->
-                    True
+                    validPileDepthOnMoveToEmptyCascade table (Move.pileDepth move)
 
         Nothing ->
             True
@@ -115,7 +158,7 @@ validToCascade table move column =
 
 validToCell : Table -> Move -> Cell -> Bool
 validToCell table move cell =
-    Table.cellEmpty cell table && Move.isOneCard move
+    Table.cellEmpty cell table && Move.pileDepth move == 1
 
 
 validToFoundation : Table -> Move -> Suit -> Bool
@@ -151,7 +194,7 @@ validToFoundation table move suit =
                 Nothing ->
                     Move.rank move == Ace
     in
-    Move.isOneCard move && suitMatches && isIncrement
+    Move.pileDepth move == 1 && suitMatches && isIncrement
 
 
 endMove : Maybe TableLoc -> Game -> Game
