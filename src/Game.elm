@@ -14,7 +14,7 @@ import Card.Rank
 import Deck exposing (Deck)
 import Move exposing (Move)
 import Position exposing (Position)
-import Table exposing (CardLoc, Cell, Column, Table)
+import Table exposing (CardLoc(..), Cell, Column, Table)
 import Table.View exposing (TableLoc(..))
 
 
@@ -35,7 +35,7 @@ new deck =
         table =
             Table.new 4 8
     in
-    Game { table | cascades = Table.View.deal table deck } Ready
+    Game (Table.View.deal table deck) Ready
 
 
 startMove : CardLoc -> Card -> Position -> Game -> Game
@@ -51,7 +51,7 @@ startMove cardLoc card position game =
             in
             case mDivided of
                 Just ( pile, table ) ->
-                    if validPileDepth table (List.length pile) then
+                    if validPileDepth cardLoc table (List.length pile) then
                         Game table (PlayerMove <| move pile)
 
                     else
@@ -88,11 +88,21 @@ maxPileDepth maxFn table =
     maxFn emptyCascades emptyCells
 
 
-validPileDepth : Table -> Int -> Bool
-validPileDepth table pileDepth =
+validPileDepth : CardLoc -> Table -> Int -> Bool
+validPileDepth cardLoc table pileDepth =
     let
         algorithm emptyCascades emptyCells =
-            2 ^ emptyCascades * (emptyCells + 1)
+            case cardLoc of
+                CascadeLoc _ row ->
+                    if row == 0 then
+                        -- Picking up a full cascade shouldn't count the active cascade as an empty one
+                        2 ^ (emptyCascades - 1) * (emptyCells + 1)
+
+                    else
+                        2 ^ emptyCascades * (emptyCells + 1)
+
+                _ ->
+                    1
     in
     pileDepth <= maxPileDepth algorithm table
 

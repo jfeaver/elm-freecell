@@ -1,4 +1,21 @@
-module Table.View exposing (..)
+module Table.View exposing
+    ( TableLoc(..)
+    , backgroundHex
+    , cardMark
+    , cascadesOffset
+    , cascadesTop
+    , deal
+    , expandedPlayHeight
+    , height
+    , horizontalOffset
+    , locFor
+    , padding
+    , pileDepthOffset
+    , positionFor
+    , topOffset
+    , width
+    , zIndexFor
+    )
 
 import Array exposing (Array)
 import Card exposing (Card, Suit(..))
@@ -254,9 +271,9 @@ recursiveDeal table row column cascades deck =
                 cascades
 
 
-deal : Table -> Deck -> Array (List Card)
+deal : Table -> Deck -> Table
 deal table deck =
-    recursiveDeal table 0 0 table.cascades deck
+    { table | cascades = recursiveDeal table 0 0 table.cascades deck }
 
 
 zIndexFor : CardLoc -> Int
