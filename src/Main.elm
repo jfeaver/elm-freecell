@@ -36,8 +36,8 @@ type Model
 
 
 type Msg
-    = NewGame Deck
-    | RequestNewGame
+    = SetGame Deck
+    | NewGame
     | MouseDown ( CardLoc, Card ) Event
     | MouseMove Event
     | MouseUp Event
@@ -46,7 +46,7 @@ type Msg
 
 startGame : Cmd Msg
 startGame =
-    Random.generate NewGame Deck.randomDeck
+    Random.generate SetGame Deck.randomDeck
 
 
 init : ( Model, Cmd Msg )
@@ -57,14 +57,14 @@ init =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        NewGame deck ->
+        SetGame deck ->
             let
                 game =
                     Game.new deck
             in
             ( InGame game, Cmd.none )
 
-        RequestNewGame ->
+        NewGame ->
             ( model, startGame )
 
         MouseDown ( cardLoc, card ) { clientPos, button } ->
@@ -172,7 +172,7 @@ body model =
 header : Html Msg
 header =
     div []
-        [ button [ onClick RequestNewGame, css [ cursor pointer ] ] [ text "New Game" ]
+        [ button [ onClick NewGame, css [ cursor pointer ] ] [ text "New Game" ]
         ]
 
 
