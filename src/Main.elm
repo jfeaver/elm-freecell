@@ -69,9 +69,6 @@ update msg model =
 
         MouseDown ( cardLoc, card ) { clientPos, button } ->
             case model of
-                MainMenu ->
-                    ( model, Cmd.none )
-
                 InGame game ->
                     let
                         updatedGame =
@@ -83,6 +80,9 @@ update msg model =
                                     game
                     in
                     ( InGame updatedGame, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
         MouseMove { clientPos } ->
             case model of

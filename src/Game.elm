@@ -60,7 +60,7 @@ startMove cardLoc card position game =
                 Nothing ->
                     game
 
-        PlayerMove _ ->
+        _ ->
             game
 
 

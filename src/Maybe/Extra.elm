@@ -33,9 +33,4 @@ or maybeA maybeB =
             Just a
 
         Nothing ->
-            case maybeB of
-                Just a ->
-                    Just a
-
-                Nothing ->
-                    Nothing
+            maybeB
