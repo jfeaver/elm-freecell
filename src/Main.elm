@@ -8,6 +8,7 @@ import Card.View
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck exposing (Deck)
 import Game exposing (Game)
+import Html.Events exposing (onDoubleClick)
 import Html.Events.Extra.Mouse exposing (Event, onDown, onMove, onUp)
 import Html.Styled as Html exposing (Attribute, Html, button, div, text)
 import Html.Styled.Attributes exposing (css, fromUnstyled, id)
@@ -18,6 +19,7 @@ import Random
 import Table exposing (CardLoc(..), Cell, Column, Table)
 import Table.View
 import Task
+import Time
 
 
 main : Program () Model Msg
@@ -38,10 +40,12 @@ type Model
 type Msg
     = SetGame Deck
     | NewGame
+    | DoubleClick ( CardLoc, Card )
     | MouseDown ( CardLoc, Card ) Event
     | MouseMove Event
     | MouseUp Event
     | EndMove (Result Browser.Dom.Error ( Element, Event ))
+    | DetectDoubleClick ( CardLoc, Card ) Time.Posix
 
 
 startGame : Cmd Msg
@@ -67,6 +71,14 @@ update msg model =
         NewGame ->
             ( model, startGame )
 
+        DoubleClick ( cardLoc, card ) ->
+            case model of
+                InGame game ->
+                    ( model, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
         MouseDown ( cardLoc, card ) { clientPos, button } ->
             case model of
                 InGame game ->
@@ -79,22 +91,22 @@ update msg model =
                                 _ ->
                                     game
                     in
-                    ( InGame updatedGame, Cmd.none )
+                    ( InGame updatedGame, Task.perform (DetectDoubleClick ( cardLoc, card )) Time.now )
 
                 _ ->
                     ( model, Cmd.none )
 
         MouseMove { clientPos } ->
             case model of
-                MainMenu ->
-                    ( model, Cmd.none )
-
                 InGame game ->
                     let
                         updatedGame =
                             Game.updateMove clientPos game
                     in
                     ( InGame updatedGame, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
         MouseUp event ->
             let
@@ -108,9 +120,6 @@ update msg model =
 
         EndMove result ->
             case model of
-                MainMenu ->
-                    ( model, Cmd.none )
-
                 InGame game ->
                     case result of
                         Ok ( element, event ) ->
@@ -131,6 +140,28 @@ update msg model =
 
                         Err _ ->
                             ( model, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        DetectDoubleClick locatedCard time ->
+            case model of
+                InGame game ->
+                    let
+                        mouseDownDiff =
+                            Time.posixToMillis time - Time.posixToMillis game.lastMouseDown
+
+                        updatedGame =
+                            { game | lastMouseDown = time }
+                    in
+                    if mouseDownDiff <= 500 then
+                        update (DoubleClick locatedCard) (InGame updatedGame)
+
+                    else
+                        ( InGame updatedGame, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
 
 view : Model -> Document Msg
@@ -300,12 +331,12 @@ cardView cardLoc card =
                 , left (px (card.position |> Tuple.first))
                 ]
 
-        dragNDrop =
+        mouseDown =
             [ onDown (MouseDown ( cardLoc, card )) |> fromUnstyled
             ]
 
         attrs =
-            List.concat [ dragNDrop, [ cardImage, positioning ] ]
+            List.concat [ mouseDown, [ cardImage, positioning ] ]
     in
     div attrs []
 

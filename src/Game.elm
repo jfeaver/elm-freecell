@@ -16,11 +16,13 @@ import Move exposing (Move)
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Cell, Column, Table)
 import Table.View exposing (TableLoc(..))
+import Time
 
 
 type alias Game =
     { table : Table
     , state : State
+    , lastMouseDown : Time.Posix
     }
 
 
@@ -35,7 +37,7 @@ new deck =
         table =
             Table.new 4 8
     in
-    Game (Table.View.deal table deck) Ready
+    Game (Table.View.deal table deck) Ready (Time.millisToPosix 0)
 
 
 startMove : CardLoc -> Card -> Position -> Game -> Game
@@ -52,7 +54,7 @@ startMove cardLoc card position game =
             case mDivided of
                 Just ( pile, table ) ->
                     if validPileDepth cardLoc table (List.length pile) then
-                        Game table (PlayerMove <| move pile)
+                        { game | table = table, state = PlayerMove <| move pile }
 
                     else
                         game
@@ -243,4 +245,4 @@ endMove mTableLoc game =
                         Nothing ->
                             move
             in
-            Game (Move.finalize game.table theMove) Ready
+            { game | table = Move.finalize game.table theMove, state = Ready }
