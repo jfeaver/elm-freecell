@@ -88,17 +88,22 @@ validPile cards =
             True
 
 
+pileHeight : List Card -> Row -> Int
+pileHeight cards row =
+    let
+        columnDepth =
+            List.length cards
+    in
+    columnDepth - row
+
+
 pickPile : CardLoc -> Table -> Maybe ( List Card, Table )
 pickPile cardLoc table =
     case cardLoc of
         CascadeLoc column row ->
             let
                 takeTopN columnCards =
-                    let
-                        columnDepth =
-                            List.length columnCards
-                    in
-                    List.Extra.partitionN (columnDepth - row) columnCards
+                    List.Extra.partitionN (pileHeight columnCards row) columnCards
 
                 validatePileMapper ( pile, leftBehind ) =
                     case validPile pile of

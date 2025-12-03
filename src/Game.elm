@@ -1,6 +1,7 @@
 module Game exposing
     ( Game
     , State(..)
+    , autoMove
     , endMove
     , new
     , startMove
@@ -12,6 +13,8 @@ import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color
 import Card.Rank
 import Deck exposing (Deck)
+import List.Extra
+import Maybe.Extra
 import Move exposing (Move)
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Cell, Column, Table)
@@ -45,19 +48,12 @@ startMove cardLoc card position game =
     case game.state of
         Ready ->
             let
-                mDivided =
-                    Table.pickPile cardLoc game.table
-
                 move pile =
                     Move.new cardLoc card pile position
             in
-            case mDivided of
+            case pickMovablePile cardLoc game of
                 Just ( pile, table ) ->
-                    if validPileDepth cardLoc table (List.length pile) then
-                        { game | table = table, state = PlayerMove <| move pile }
-
-                    else
-                        game
+                    { game | table = table, state = PlayerMove <| move pile }
 
                 Nothing ->
                     game
@@ -76,7 +72,62 @@ updateMove position game =
             { game | state = PlayerMove (Move.update position lastMove) }
 
 
-{-| The max function takes the number of empty cascades and then the number of empty cells and returns the maximum depth you can move
+autoMove : Game -> Game
+autoMove game =
+    case game.state of
+        PlayerMove move ->
+            let
+                moveNothing _ =
+                    if Move.pileDepth move == 0 then
+                        Just move
+
+                    else
+                        Nothing
+
+                maybeSuit =
+                    Move.showingSuit move
+
+                moveToFoundation _ =
+                    -- if can move to a foundation then move to foundation
+                    case maybeSuit of
+                        Just suit ->
+                            if validToFoundation game.table move suit then
+                                Just (Move.toFoundation suit move)
+
+                            else
+                                Nothing
+
+                        Nothing ->
+                            Nothing
+
+                maybeMatchingCascade _ =
+                    List.Extra.find (validToCascade game.table move) (List.range 0 (game.table.cascadesCount - 1))
+
+                moveToCascade _ =
+                    -- if a pile has a matching cascade then move to cascade
+                    maybeMatchingCascade Nothing
+                        |> Maybe.map (\column -> Move.toCascade column game.table move)
+
+                maybeFreeCell _ =
+                    List.Extra.find (validToCell game.table move) (List.range 0 (game.table.cellsCount - 1))
+
+                moveToCell _ =
+                    -- if moving a single card and an open cell exists then move to cell
+                    maybeFreeCell Nothing
+                        |> Maybe.map (\cell -> Move.toCell cell move)
+            in
+            case Maybe.Extra.try4 moveNothing moveToFoundation moveToCascade moveToCell move of
+                Just updatedMove ->
+                    { game | table = Move.finalize game.table updatedMove, state = Ready }
+
+                Nothing ->
+                    game
+
+        _ ->
+            game
+
+
+{-| The max function takes the number of empty cascades and then the number of empty cells and returns the maximum number of cards you can move
 -}
 maxPileDepth : (Int -> Int -> Int) -> Table -> Int
 maxPileDepth maxFn table =
@@ -90,10 +141,16 @@ maxPileDepth maxFn table =
     maxFn emptyCascades emptyCells
 
 
-validPileDepth : CardLoc -> Table -> Int -> Bool
-validPileDepth cardLoc table pileDepth =
+pickMovablePile : CardLoc -> Game -> Maybe ( List Card, Table )
+pickMovablePile cardLoc game =
+    Table.pickPile cardLoc game.table
+        |> Maybe.andThen (maybePileMove cardLoc)
+
+
+maybePileMove : CardLoc -> ( List Card, Table ) -> Maybe ( List Card, Table )
+maybePileMove cardLoc ( pile, table ) =
     let
-        algorithm emptyCascades emptyCells =
+        maxCardsToMove emptyCascades emptyCells =
             case cardLoc of
                 CascadeLoc _ row ->
                     if row == 0 then
@@ -106,7 +163,11 @@ validPileDepth cardLoc table pileDepth =
                 _ ->
                     1
     in
-    pileDepth <= maxPileDepth algorithm table
+    if List.length pile <= maxPileDepth maxCardsToMove table then
+        Just ( pile, table )
+
+    else
+        Nothing
 
 
 {-| While moving to an empty cascade you can't consider it to be
@@ -117,14 +178,14 @@ cascade either.
 validPileDepthOnMoveToEmptyCascade : Table -> Move -> Bool
 validPileDepthOnMoveToEmptyCascade table move =
     let
-        algorithm emptyCascades emptyCells =
+        maxCardsToMove emptyCascades emptyCells =
             if Move.isFullCascade move then
                 2 ^ (emptyCascades - 2) * (emptyCells + 1)
 
             else
                 2 ^ (emptyCascades - 1) * (emptyCells + 1)
     in
-    Move.pileDepth move <= maxPileDepth algorithm table
+    Move.pileDepth move <= maxPileDepth maxCardsToMove table
 
 
 {-| For moving onto cascades
@@ -219,28 +280,26 @@ endMove mTableLoc game =
             let
                 theMove =
                     case mTableLoc of
-                        Just tableLoc ->
-                            case tableLoc of
-                                TableCascade column ->
-                                    if validToCascade game.table move column then
-                                        Move.toCascade column game.table move
+                        Just (TableCascade column) ->
+                            if validToCascade game.table move column then
+                                Move.toCascade column game.table move
 
-                                    else
-                                        move
+                            else
+                                move
 
-                                TableCell cell ->
-                                    if validToCell game.table move cell then
-                                        Move.toCell cell move
+                        Just (TableCell cell) ->
+                            if validToCell game.table move cell then
+                                Move.toCell cell move
 
-                                    else
-                                        move
+                            else
+                                move
 
-                                TableFoundation suit ->
-                                    if validToFoundation game.table move suit then
-                                        Move.toFoundation suit move
+                        Just (TableFoundation suit) ->
+                            if validToFoundation game.table move suit then
+                                Move.toFoundation suit move
 
-                                    else
-                                        move
+                            else
+                                move
 
                         Nothing ->
                             move

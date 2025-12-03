@@ -33,6 +33,8 @@ type Move
         }
 
 
+{-| TODO: Could enforce at least one card is moved here
+-}
 new : CardLoc -> Card -> List Card -> Position -> Move
 new cardLoc topCard pile position =
     let
@@ -180,6 +182,8 @@ toFoundation suit (Move move) =
     Move { move | to = FoundationLoc suit }
 
 
+{-| TODO: Could simplify this similar to rank/showingSuit
+-}
 color : Move -> CardColor
 color (Move { pile }) =
     case Card.Color.fromPileTop pile of

@@ -40,12 +40,12 @@ type Model
 type Msg
     = SetGame Deck
     | NewGame
-    | DoubleClick ( CardLoc, Card )
+    | DoubleClick
     | MouseDown ( CardLoc, Card ) Event
     | MouseMove Event
     | MouseUp Event
     | EndMove (Result Browser.Dom.Error ( Element, Event ))
-    | DetectDoubleClick ( CardLoc, Card ) Time.Posix
+    | DetectDoubleClick Time.Posix
 
 
 startGame : Cmd Msg
@@ -71,10 +71,10 @@ update msg model =
         NewGame ->
             ( model, startGame )
 
-        DoubleClick ( cardLoc, card ) ->
+        DoubleClick ->
             case model of
                 InGame game ->
-                    ( model, Cmd.none )
+                    ( InGame (Game.autoMove game), Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -91,7 +91,7 @@ update msg model =
                                 _ ->
                                     game
                     in
-                    ( InGame updatedGame, Task.perform (DetectDoubleClick ( cardLoc, card )) Time.now )
+                    ( InGame updatedGame, Task.perform DetectDoubleClick Time.now )
 
                 _ ->
                     ( model, Cmd.none )
@@ -144,7 +144,7 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        DetectDoubleClick locatedCard time ->
+        DetectDoubleClick time ->
             case model of
                 InGame game ->
                     let
@@ -155,7 +155,7 @@ update msg model =
                             { game | lastMouseDown = time }
                     in
                     if mouseDownDiff <= 500 then
-                        update (DoubleClick locatedCard) (InGame updatedGame)
+                        update DoubleClick (InGame updatedGame)
 
                     else
                         ( InGame updatedGame, Cmd.none )
