@@ -145,6 +145,7 @@ update msg model =
                     ( model, Cmd.none )
 
         DetectDoubleClick time ->
+            -- TODO: Fix triple click
             case model of
                 InGame game ->
                     let

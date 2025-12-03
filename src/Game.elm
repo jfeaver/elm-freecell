@@ -84,23 +84,20 @@ autoMove game =
                     else
                         Nothing
 
-                maybeSuit =
-                    Move.showingSuit move
-
                 moveToFoundation _ =
                     -- if can move to a foundation then move to foundation
-                    case maybeSuit of
-                        Just suit ->
-                            if validToFoundation game.table move suit then
-                                Just (Move.toFoundation suit move)
+                    let
+                        suit =
+                            Move.showingSuit move
+                    in
+                    if validToFoundation game.table move suit then
+                        Just (Move.toFoundation suit move)
 
-                            else
-                                Nothing
-
-                        Nothing ->
-                            Nothing
+                    else
+                        Nothing
 
                 maybeMatchingCascade _ =
+                    -- TODO: Prefer moving to a non-empty cascade if available
                     List.Extra.find (validToCascade game.table move) (List.range 0 (game.table.cascadesCount - 1))
 
                 moveToCascade _ =
@@ -237,14 +234,6 @@ validToCell table move cell =
 validToFoundation : Table -> Move -> Suit -> Bool
 validToFoundation table move suit =
     let
-        suitMatches =
-            case Move.showingSuit move of
-                Just moveSuit ->
-                    moveSuit == suit
-
-                Nothing ->
-                    False
-
         foundationCard =
             case suit of
                 Diamonds ->
@@ -267,7 +256,7 @@ validToFoundation table move suit =
                 Nothing ->
                     Move.rank move == Ace
     in
-    Move.pileDepth move == 1 && suitMatches && isIncrement
+    Move.pileDepth move == 1 && Move.showingSuit move == suit && isIncrement
 
 
 endMove : Maybe TableLoc -> Game -> Game

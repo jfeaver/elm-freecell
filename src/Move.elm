@@ -30,11 +30,13 @@ type Move
         , pile : List Card
         , topCardStart : Position
         , mouseStart : Position
+        , pileDepth : Int
+        , rank : Rank
+        , color : CardColor
+        , showingSuit : Suit
         }
 
 
-{-| TODO: Could enforce at least one card is moved here
--}
 new : CardLoc -> Card -> List Card -> Position -> Move
 new cardLoc topCard pile position =
     let
@@ -47,6 +49,10 @@ new cardLoc topCard pile position =
         , pile = List.indexedMap zIndexInHand pile
         , topCardStart = topCard.position
         , mouseStart = position
+        , pileDepth = List.length pile
+        , rank = topCard.rank
+        , showingSuit = topCard.suit
+        , color = Card.Color.fromCard topCard
         }
 
 
@@ -76,8 +82,8 @@ indexedMap fn (Move { pile }) =
 
 
 pileDepth : Move -> Int
-pileDepth (Move { pile }) =
-    List.length pile
+pileDepth (Move move) =
+    move.pileDepth
 
 
 {-| Position the card, apply correct z index, and update the table
@@ -182,38 +188,19 @@ toFoundation suit (Move move) =
     Move { move | to = FoundationLoc suit }
 
 
-{-| TODO: Could simplify this similar to rank/showingSuit
--}
 color : Move -> CardColor
-color (Move { pile }) =
-    case Card.Color.fromPileTop pile of
-        Just theColor ->
-            theColor
-
-        Nothing ->
-            -- shouldn't happen
-            Black
+color (Move move) =
+    move.color
 
 
 rank : Move -> Rank
-rank (Move { pile }) =
-    case pile of
-        card :: _ ->
-            Card.Rank.incrementN (List.length pile - 1) card.rank
-
-        [] ->
-            -- shouldn't happen
-            King
+rank (Move move) =
+    move.rank
 
 
-showingSuit : Move -> Maybe Suit
+showingSuit : Move -> Suit
 showingSuit (Move move) =
-    case move.pile of
-        { suit } :: _ ->
-            Just suit
-
-        _ ->
-            Nothing
+    move.showingSuit
 
 
 isFullCascade : Move -> Bool
