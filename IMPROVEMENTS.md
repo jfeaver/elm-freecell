@@ -4,3 +4,9 @@
 - Error messages (Can't do that because ...)
 - mouse pointer style on hover
 - double click card moves
+- Undo
+- Seeded games
+- Win/Loss messages
+- hitbox drop collisions
+- ignore right click
+- highlight parent cards on hover
