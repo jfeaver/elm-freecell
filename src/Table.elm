@@ -106,12 +106,11 @@ pickPile cardLoc table =
                     List.Extra.partitionN (pileHeight columnCards row) columnCards
 
                 validatePileMapper ( pile, leftBehind ) =
-                    case validPile pile of
-                        True ->
-                            Just ( pile, leftBehind )
+                    if validPile pile then
+                        Just ( pile, leftBehind )
 
-                        False ->
-                            Nothing
+                    else
+                        Nothing
 
                 mDividedPiles : Maybe ( List Card, List Card )
                 mDividedPiles =
@@ -123,12 +122,11 @@ pickPile cardLoc table =
                         |> takeTopN
                         |> validatePileMapper
             in
-            case mDividedPiles of
-                Just ( pile, leftBehind ) ->
-                    Just ( pile, { table | cascades = Array.set column leftBehind table.cascades } )
-
-                Nothing ->
-                    Nothing
+            mDividedPiles
+                |> Maybe.map
+                    (\( pile, leftBehind ) ->
+                        ( pile, { table | cascades = Array.set column leftBehind table.cascades } )
+                    )
 
         Hand _ ->
             Nothing

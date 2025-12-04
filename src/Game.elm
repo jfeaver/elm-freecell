@@ -96,9 +96,15 @@ autoMove game =
                     else
                         Nothing
 
+                tableCascadesIndices =
+                    List.range 0 (game.table.cascadesCount - 1)
+
+                tableCellsIndices =
+                    List.range 0 (game.table.cellsCount - 1)
+
                 maybeMatchingCascade _ =
                     -- TODO: Prefer moving to a non-empty cascade if available
-                    List.Extra.find (validToCascade game.table move) (List.range 0 (game.table.cascadesCount - 1))
+                    List.Extra.find (validToCascade game.table move) tableCascadesIndices
 
                 moveToCascade _ =
                     -- if a pile has a matching cascade then move to cascade
@@ -106,7 +112,7 @@ autoMove game =
                         |> Maybe.map (\column -> Move.toCascade column game.table move)
 
                 maybeFreeCell _ =
-                    List.Extra.find (validToCell game.table move) (List.range 0 (game.table.cellsCount - 1))
+                    List.Extra.find (validToCell game.table move) tableCellsIndices
 
                 moveToCell _ =
                     -- if moving a single card and an open cell exists then move to cell

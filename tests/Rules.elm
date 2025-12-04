@@ -6,12 +6,13 @@ module Rules exposing
 import Array
 import Card exposing (Card, Rank(..), Suit(..))
 import Deck
-import Expect exposing (Expectation)
+import Expect
 import Game exposing (Game, State(..))
 import Move
 import Table exposing (CardLoc(..))
 import Table.View exposing (TableLoc(..))
 import Test exposing (..)
+import Time
 
 
 pickUps : Test
@@ -36,15 +37,18 @@ pickUps =
                     dealAPile t =
                         { t | cascades = Array.set 0 aPickablePile t.cascades }
 
-                    table =
-                        Table.View.deal (Table.new 4 8) Deck.fullDeck
-                            |> dealAPile
-
                     cardLoc =
                         CascadeLoc 0 0
 
+                    newGame =
+                        Game.new Deck.fullDeck
+
+                    table =
+                        newGame.table
+                            |> dealAPile
+
                     game =
-                        Game table Ready
+                        { newGame | table = table }
                 in
                 Expect.all
                     [ \t ->
@@ -100,7 +104,7 @@ putDowns =
 
                     game : Game
                     game =
-                        Game table move
+                        Game table move (Time.millisToPosix 0)
                             |> Game.endMove (Just tableLoc)
 
                     finalTable =

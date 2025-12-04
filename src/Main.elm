@@ -8,9 +8,8 @@ import Card.View
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck exposing (Deck)
 import Game exposing (Game)
-import Html.Events exposing (onDoubleClick)
 import Html.Events.Extra.Mouse exposing (Event, onDown, onMove, onUp)
-import Html.Styled as Html exposing (Attribute, Html, button, div, text)
+import Html.Styled as Html exposing (Html, button, div, text)
 import Html.Styled.Attributes exposing (css, fromUnstyled, id)
 import Html.Styled.Events exposing (onClick)
 import Move
