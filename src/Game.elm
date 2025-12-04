@@ -102,14 +102,42 @@ autoMove game =
                 tableCellsIndices =
                     List.range 0 (game.table.cellsCount - 1)
 
-                maybeMatchingCascade _ =
-                    -- TODO: Prefer moving to a non-empty cascade if available
-                    List.Extra.find (validToCascade game.table move) tableCascadesIndices
+                validCascadeFolder : Table.Column -> Maybe ( Bool, Table.Column ) -> Maybe ( Bool, Table.Column )
+                validCascadeFolder column mCascade =
+                    case mCascade of
+                        Just ( True, foundColumn ) ->
+                            -- A non-empty cascade has already been found so prefer to keep it
+                            Just ( True, foundColumn )
+
+                        Just ( False, foundColumn ) ->
+                            if validToCascade game.table move column then
+                                if not (Table.cascadeEmpty column game.table) then
+                                    -- A new valid cascade is found which is non-empty so prefer it
+                                    Just ( True, column )
+                                else
+                                    -- Prefer the first empty cascade found rather than this new one
+                                    Just ( False, foundColumn )
+
+                            else
+                                -- This cascade isn't valid so we'll hang onto the empty cascade
+                                Just ( False, foundColumn )
+
+                        Nothing ->
+                            -- No previous column is valid but maybe this one is
+                            if validToCascade game.table move column then
+                                -- A new valid cascade is found add True as the first Tuple term if the cascade is non-empty
+                                Just ( not (Table.cascadeEmpty column game.table), column )
+
+                            else
+                                Nothing
+
+                maybeCascade _ =
+                    List.foldl validCascadeFolder Nothing tableCascadesIndices
 
                 moveToCascade _ =
                     -- if a pile has a matching cascade then move to cascade
-                    maybeMatchingCascade Nothing
-                        |> Maybe.map (\column -> Move.toCascade column game.table move)
+                    maybeCascade Nothing
+                        |> Maybe.map (\( _, column ) -> Move.toCascade column game.table move)
 
                 maybeFreeCell _ =
                     List.Extra.find (validToCell game.table move) tableCellsIndices

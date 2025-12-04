@@ -5,6 +5,7 @@ module Table exposing
     , Depth
     , Row
     , Table
+    , cascadeEmpty
     , cellEmpty
     , emptyCascades
     , emptyCells
@@ -169,6 +170,15 @@ cellEmpty cell table =
         |> Maybe.Extra.isNothing
 
 
+cascadeEmpty : Column -> Table -> Bool
+cascadeEmpty column table =
+    table.cascades
+        |> Array.get column
+        |> Maybe.withDefault []
+        |> List.length
+        |> (==) 0
+
+
 countEmptyCascades : Column -> Int -> Table -> Int
 countEmptyCascades column count table =
     if column == table.cascadesCount then
@@ -176,17 +186,14 @@ countEmptyCascades column count table =
 
     else
         let
-            cascade =
-                Array.get column table.cascades
-                    |> Maybe.withDefault []
-
             newCount =
-                if List.length cascade == 0 then
+                if cascadeEmpty column table then
                     count + 1
 
                 else
                     count
         in
+        -- TODO: Remove recursion?
         countEmptyCascades (column + 1) newCount table
 
 

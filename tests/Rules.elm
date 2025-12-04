@@ -92,19 +92,21 @@ putDowns =
                     dealAnEmpty t =
                         { t | cascades = Array.set 0 [] t.cascades }
 
-                    table =
-                        Table.View.deal (Table.new 4 8) Deck.fullDeck
-                            |> dealAnEmpty
-
                     tableLoc =
                         TableCascade 0
 
                     move =
                         PlayerMove (Move.new pickedFrom pickedCard pickedPile ( 0, 0 ))
 
-                    game : Game
+                    newGame =
+                        Game.new Deck.fullDeck
+
+                    table =
+                        newGame.table
+                            |> dealAnEmpty
+
                     game =
-                        Game table move (Time.millisToPosix 0)
+                        { newGame | state = move, table = table }
                             |> Game.endMove (Just tableLoc)
 
                     finalTable =
@@ -119,5 +121,4 @@ putDowns =
                     |> Maybe.withDefault [ pickedCard ]
                     |> List.length
                     |> Expect.equal 0
-        , todo "picking up all cards from one pile and placing in an empty cascade is not allowed to use empty cascades in the calculation"
         ]
