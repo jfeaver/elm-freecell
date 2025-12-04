@@ -27,6 +27,7 @@ import Html.Styled.Attributes exposing (css)
 import Maybe.Extra
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Cell, Column, Depth, Row, Table)
+import UI
 
 
 type TableLoc
@@ -37,17 +38,17 @@ type TableLoc
 
 width : Float
 width =
-    800
+    UI.windowWidth
 
 
 height : Float
 height =
-    600
+    width * 3 / 4 |> UI.roundToWhole
 
 
 borderWidth : Float
 borderWidth =
-    3
+    3 |> UI.zoomedR
 
 
 backgroundHex : String
@@ -73,48 +74,55 @@ cardMark =
 
 padding : Float
 padding =
-    12
+    12 |> UI.zoomedR
 
 
 halfPadding : Float
 halfPadding =
-    padding / 2
+    padding / 2 |> UI.roundToHalf
 
 
 doublePadding : Float
 doublePadding =
-    padding * 2
+    padding * 2 |> UI.roundToHalf
 
 
 topOffset : Float
 topOffset =
-    40
+    40 |> UI.zoomedR
 
 
 horizontalOffset : Float
 horizontalOffset =
-    30
+    30 |> UI.zoomedR
 
 
 cascadesOffset : Table -> Float
 cascadesOffset table =
-    (width - toFloat table.cascadesCount * (Card.View.width + padding)) / 2
+    (width - toFloat table.cascadesCount * (Card.View.width + padding))
+        / 2
+        |> UI.roundToHalf
 
 
 cascadesTop : Float
 cascadesTop =
-    topOffset + Card.View.height + doublePadding
+    topOffset
+        + Card.View.height
+        + doublePadding
+        |> UI.roundToHalf
 
 
 pileSpacing : Float
 pileSpacing =
     -- pixels between the top of one card and the top of the next card in a pile
-    25
+    25 |> UI.zoomedR
 
 
 pileDepthOffset : Depth -> Float
 pileDepthOffset depth =
-    toFloat depth * pileSpacing
+    toFloat depth
+        * pileSpacing
+        |> UI.roundToHalf
 
 
 positionFor : Table -> CardLoc -> Position

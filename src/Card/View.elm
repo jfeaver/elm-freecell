@@ -1,6 +1,7 @@
 module Card.View exposing (..)
 
 import Card exposing (Card, Rank(..), Suit(..))
+import UI
 
 
 rankName : Rank -> String
@@ -69,7 +70,7 @@ filename card =
 
 width : Float
 width =
-    75
+    75 |> UI.zoomed |> UI.roundToWhole
 
 
 aspectRatio : Float
@@ -79,7 +80,7 @@ aspectRatio =
 
 height : Float
 height =
-    width * aspectRatio
+    width * aspectRatio |> UI.roundToWhole
 
 
 suitIconSrc : Suit -> String
