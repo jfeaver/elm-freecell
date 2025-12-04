@@ -1,12 +1,11 @@
 - Card positions could be based on their pile position rather than individually positioned
 - 50 images are loaded separately!! Let's embed the SVG directly?
-- CSS animations/animation frames (animate cancelled moves)
+- CSS animations/animation frames (animate cancelled moves and auto moves)
 - Error messages (Can't do that because ...)
 - mouse pointer style on hover
-- double click card moves
-- Undo
-- Seeded games
-- Win/Loss messages
-- hitbox drop collisions
-- ignore right click
 - highlight parent cards on hover
+- Undo
+- Seeded games (maybe an easy win game to make dev easier)
+- Win/Loss conditions and messages
+- hitbox drop collisions (versus point collision right now)
+- ignore right click
