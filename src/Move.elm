@@ -17,7 +17,6 @@ module Move exposing
 import Array
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color exposing (CardColor(..))
-import Card.Rank
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Cell, Column, Table)
 import Table.View
