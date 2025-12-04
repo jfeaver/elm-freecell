@@ -8,6 +8,7 @@ module Move exposing
     , pileDepth
     , rank
     , showingSuit
+    , startsFromCascade
     , toCascade
     , toCell
     , toFoundation
@@ -207,6 +208,16 @@ isFullCascade (Move move) =
     case move.from of
         CascadeLoc _ row ->
             row == 0
+
+        _ ->
+            False
+
+
+startsFromCascade : Column -> Move -> Bool
+startsFromCascade column (Move { from }) =
+    case from of
+        CascadeLoc fromColumn _ ->
+            fromColumn == column
 
         _ ->
             False
