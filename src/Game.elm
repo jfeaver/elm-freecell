@@ -26,6 +26,7 @@ type alias Game =
     { table : Table
     , state : State
     , lastMouseDown : Time.Posix
+    , doubleClickLast : Bool
     }
 
 
@@ -40,7 +41,7 @@ new deck =
         table =
             Table.new 4 8
     in
-    Game (Table.View.deal table deck) Ready (Time.millisToPosix 0)
+    Game (Table.View.deal table deck) Ready (Time.millisToPosix 0) False
 
 
 startMove : CardLoc -> Card -> Position -> Game -> Game
@@ -114,6 +115,7 @@ autoMove game =
                                 if not (Table.cascadeEmpty column game.table) then
                                     -- A new valid cascade is found which is non-empty so prefer it
                                     Just ( True, column )
+
                                 else
                                     -- Prefer the first empty cascade found rather than this new one
                                     Just ( False, foundColumn )

@@ -73,7 +73,11 @@ update msg model =
         DoubleClick ->
             case model of
                 InGame game ->
-                    ( InGame (Game.autoMove game), Cmd.none )
+                    let
+                        updatedGame =
+                            Game.autoMove game
+                    in
+                    ( InGame { updatedGame | doubleClickLast = True }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -144,7 +148,6 @@ update msg model =
                     ( model, Cmd.none )
 
         DetectDoubleClick time ->
-            -- TODO: Fix triple click
             case model of
                 InGame game ->
                     let
@@ -152,9 +155,9 @@ update msg model =
                             Time.posixToMillis time - Time.posixToMillis game.lastMouseDown
 
                         updatedGame =
-                            { game | lastMouseDown = time }
+                            { game | lastMouseDown = time, doubleClickLast = False }
                     in
-                    if mouseDownDiff <= 500 then
+                    if mouseDownDiff <= 500 && not game.doubleClickLast then
                         update DoubleClick (InGame updatedGame)
 
                     else
