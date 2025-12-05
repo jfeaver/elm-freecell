@@ -5,9 +5,10 @@ import Browser exposing (Document)
 import Browser.Dom exposing (Element)
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.View
-import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
+import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck exposing (Deck)
 import Game exposing (Game)
+import Html.Events exposing (onMouseEnter, onMouseLeave)
 import Html.Events.Extra.Mouse exposing (Event, onDown, onMove, onUp)
 import Html.Styled as Html exposing (Html, button, div, text)
 import Html.Styled.Attributes exposing (css, fromUnstyled, id)
@@ -41,6 +42,8 @@ type Msg
     | NewGame
     | DoubleClick
     | MouseDown ( CardLoc, Card ) Event
+    | FocusCard ( CardLoc, Card )
+    | DefocusCard
     | MouseMove Event
     | MouseUp Event
     | EndMove (Result Browser.Dom.Error ( Element, Event ))
@@ -95,6 +98,30 @@ update msg model =
                                     game
                     in
                     ( InGame updatedGame, Task.perform DetectDoubleClick Time.now )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        FocusCard focusedCard ->
+            case model of
+                InGame game ->
+                    let
+                        updatedGame =
+                            { game | focusedCard = Just focusedCard }
+                    in
+                    ( InGame updatedGame, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        DefocusCard ->
+            case model of
+                InGame game ->
+                    let
+                        updatedGame =
+                            { game | focusedCard = Nothing }
+                    in
+                    ( InGame updatedGame, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -195,10 +222,10 @@ body model =
                 , onUp MouseUp |> fromUnstyled
                 , id "table"
                 ]
-                [ cells game.table
-                , foundations game.table
-                , cascades game.table
-                , activeMove game.state
+                [ cells game
+                , foundations game
+                , cascades game
+                , activeMove game game.state
                 ]
             ]
 
@@ -210,10 +237,10 @@ header =
         ]
 
 
-cell : ( Cell, Maybe Card ) -> Html Msg
-cell ( cellN, maybeCard ) =
+cell : Game -> ( Cell, Maybe Card ) -> Html Msg
+cell game ( cellN, maybeCard ) =
     maybeCard
-        |> Maybe.map (\card -> cardView (CellLoc cellN) card)
+        |> Maybe.map (\card -> cardView game (CellLoc cellN) card)
         |> Maybe.withDefault
             (div
                 [ Table.View.cardMark
@@ -227,16 +254,16 @@ cell ( cellN, maybeCard ) =
             )
 
 
-cells : Table -> Html Msg
-cells table =
-    table.cells
+cells : Game -> Html Msg
+cells game =
+    game.table.cells
         |> Array.toIndexedList
-        |> List.map cell
+        |> List.map (cell game)
         |> div []
 
 
-foundation : Table -> (Table -> Maybe Card) -> Suit -> Html Msg
-foundation table fieldGetter suit =
+foundation : Game -> (Table -> Maybe Card) -> Suit -> Html Msg
+foundation game fieldGetter suit =
     let
         suitIconWidth =
             0.53 * Card.View.width
@@ -263,9 +290,9 @@ foundation table fieldGetter suit =
                 , transform (translate2 (pct -50) (pct 50))
                 ]
     in
-    case fieldGetter table of
+    case fieldGetter game.table of
         Just card ->
-            cardView (FoundationLoc suit) card
+            cardView game (FoundationLoc suit) card
 
         Nothing ->
             div [ Table.View.cardMark, positioning (3 - Card.suitIndex suit) ]
@@ -273,18 +300,18 @@ foundation table fieldGetter suit =
                 ]
 
 
-foundations : Table -> Html Msg
-foundations table =
+foundations : Game -> Html Msg
+foundations game =
     div []
-        [ foundation table .diamonds Diamonds
-        , foundation table .clubs Clubs
-        , foundation table .hearts Hearts
-        , foundation table .spades Spades
+        [ foundation game .diamonds Diamonds
+        , foundation game .clubs Clubs
+        , foundation game .hearts Hearts
+        , foundation game .spades Spades
         ]
 
 
-cascade : Float -> ( Column, List Card ) -> Html Msg
-cascade cascadesOffset ( column, cards ) =
+cascade : Game -> Float -> ( Column, List Card ) -> Html Msg
+cascade game cascadesOffset ( column, cards ) =
     div []
         (div
             [ css
@@ -295,26 +322,29 @@ cascade cascadesOffset ( column, cards ) =
             , Table.View.cardMark
             ]
             []
-            :: List.indexedMap (cascadeCardView (List.length cards) column) cards
+            :: List.indexedMap (cascadeCardView game (List.length cards) column) cards
         )
 
 
-cascades : Table -> Html Msg
-cascades table =
-    table.cascades |> Array.toIndexedList |> List.map (cascade <| Table.View.cascadesOffset table) |> div []
+cascades : Game -> Html Msg
+cascades game =
+    game.table.cascades
+        |> Array.toIndexedList
+        |> List.map (cascade game <| Table.View.cascadesMargin game.table)
+        |> div []
 
 
-cascadeCardView : Int -> Column -> Int -> Card -> Html Msg
-cascadeCardView columnDepth column inversedRow =
+cascadeCardView : Game -> Int -> Column -> Int -> Card -> Html Msg
+cascadeCardView game columnDepth column inversedRow =
     let
         row =
             (columnDepth - 1) - inversedRow
     in
-    cardView (CascadeLoc column row)
+    cardView game (CascadeLoc column row)
 
 
-cardView : CardLoc -> Card -> Html Msg
-cardView cardLoc card =
+cardView : Game -> CardLoc -> Card -> Html Msg
+cardView game cardLoc card =
     let
         cardImage =
             css
@@ -330,22 +360,53 @@ cardView cardLoc card =
             css
                 [ display inlineBlock
                 , position absolute
-                , top (px (card.position |> Tuple.second))
+                , top
+                    (px (card.position |> Tuple.second))
                 , left (px (card.position |> Tuple.first))
                 ]
 
-        mouseDown =
-            [ onDown (MouseDown ( cardLoc, card )) |> fromUnstyled
+        validPile column row =
+            game.table
+                |> Table.pileTo ( column, row )
+                |> Tuple.first
+                |> Table.validPile
+
+        hoverOnCard =
+            case game.focusedCard of
+                Just ( focusedCardLoc, _ ) ->
+                    case focusedCardLoc of
+                        CascadeLoc column row ->
+                            if (cardLoc == focusedCardLoc) && validPile column row then
+                                css
+                                    [ hover [ cursor pointer ]
+                                    ]
+
+                            else
+                                css []
+
+                        _ ->
+                            css
+                                [ hover [ cursor pointer ]
+                                ]
+
+                Nothing ->
+                    css []
+
+        interaction =
+            [ onDown (MouseDown ( cardLoc, card ))
+            , onMouseEnter (FocusCard ( cardLoc, card ))
+            , onMouseLeave DefocusCard
             ]
+                |> List.map fromUnstyled
 
         attrs =
-            List.concat [ mouseDown, [ cardImage, positioning ] ]
+            List.concat [ interaction, [ cardImage, positioning, hoverOnCard ] ]
     in
     div attrs []
 
 
-activeMove : Game.State -> Html Msg
-activeMove state =
+activeMove : Game -> Game.State -> Html Msg
+activeMove game state =
     case state of
         Game.Ready ->
             div [] []
@@ -353,7 +414,7 @@ activeMove state =
         Game.PlayerMove move ->
             let
                 toCardView depth =
-                    cardView (Hand depth)
+                    cardView game (Hand depth)
 
                 cardsHtml =
                     Move.indexedMap toCardView move

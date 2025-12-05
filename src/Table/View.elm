@@ -2,7 +2,7 @@ module Table.View exposing
     ( TableLoc(..)
     , backgroundHex
     , cardMark
-    , cascadesOffset
+    , cascadesMargin
     , cascadesTop
     , deal
     , expandedPlayHeight
@@ -18,6 +18,7 @@ module Table.View exposing
     )
 
 import Array exposing (Array)
+import Basics.Extra exposing (divMod)
 import Card exposing (Card, Suit(..))
 import Card.View
 import Css exposing (border3, borderRadius, hex, px, solid)
@@ -31,7 +32,7 @@ import UI
 
 
 type TableLoc
-    = TableCascade Column
+    = TableCascade Column Row
     | TableCell Cell
     | TableFoundation Suit
 
@@ -97,8 +98,10 @@ horizontalOffset =
     30 |> UI.zoomedR
 
 
-cascadesOffset : Table -> Float
-cascadesOffset table =
+{-| The left/right margin of the cascades.
+-}
+cascadesMargin : Table -> Float
+cascadesMargin table =
     (width - toFloat table.cascadesCount * (Card.View.width + padding))
         / 2
         |> UI.roundToHalf
@@ -112,9 +115,10 @@ cascadesTop =
         |> UI.roundToHalf
 
 
+{-| pixels between the top of one card and the top of the next card in a pile
+-}
 pileSpacing : Float
 pileSpacing =
-    -- pixels between the top of one card and the top of the next card in a pile
     25 |> UI.zoomedR
 
 
@@ -131,7 +135,7 @@ positionFor table cardLoc =
         CascadeLoc column row ->
             let
                 left =
-                    cascadesOffset table + toFloat column * (Card.View.width + padding)
+                    cascadesMargin table + toFloat column * (Card.View.width + padding)
 
                 top =
                     cascadesTop + toFloat row * pileSpacing
@@ -155,23 +159,29 @@ positionFor table cardLoc =
 cascadesLocFor : Table -> Position -> Maybe TableLoc
 cascadesLocFor table ( left, top ) =
     let
-        leftCascadesOffset =
-            cascadesOffset table - halfPadding
+        xMargin =
+            cascadesMargin table
 
-        topCascadesOffset =
-            cascadesTop - halfPadding
+        x =
+            left - xMargin
 
-        leftCascades =
-            left - leftCascadesOffset
+        y =
+            top - cascadesTop - 21.5
 
-        topCascades =
-            top - topCascadesOffset
+        ( column, columnX ) =
+            divMod (x |> round) (Card.View.width + padding |> round)
+
+        row =
+            (y / pileSpacing) |> floor
     in
-    if topCascades < 0 || leftCascades < 0 || left > (width - leftCascadesOffset) then
+    if y < 0 || x < 0 || left > (width - xMargin - padding) then
+        Nothing
+
+    else if (columnX |> toFloat) > Card.View.width then
         Nothing
 
     else
-        Just <| TableCascade (floor (leftCascades / (Card.View.width + padding)))
+        Just <| TableCascade column row
 
 
 cellsLocFor : Table -> Position -> Maybe TableLoc

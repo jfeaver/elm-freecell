@@ -11,6 +11,7 @@ module Table exposing
     , emptyCells
     , new
     , pickPile
+    , pileTo
     , validPile
     )
 
@@ -98,14 +99,23 @@ pileHeight cards row =
     columnDepth - row
 
 
+{-| Creates two piles from the card's cascade and returns them as two lists in a tuple.
+-| The first list is the card specified and all cards below it. The second list is the
+-| cards left behind in the cascade.
+-}
+pileTo : ( Column, Row ) -> Table -> ( List Card, List Card )
+pileTo ( column, row ) table =
+    table.cascades
+        |> Array.get column
+        |> Maybe.withDefault []
+        |> (\cards -> List.Extra.partitionN (pileHeight cards row) cards)
+
+
 pickPile : CardLoc -> Table -> Maybe ( List Card, Table )
 pickPile cardLoc table =
     case cardLoc of
         CascadeLoc column row ->
             let
-                takeTopN columnCards =
-                    List.Extra.partitionN (pileHeight columnCards row) columnCards
-
                 validatePileMapper ( pile, leftBehind ) =
                     if validPile pile then
                         Just ( pile, leftBehind )
@@ -113,14 +123,10 @@ pickPile cardLoc table =
                     else
                         Nothing
 
+                -- Generates data like: Maybe (pile, leftBehind)
                 mDividedPiles : Maybe ( List Card, List Card )
                 mDividedPiles =
-                    -- Maybe (pile, leftBehind)
-                    -- TODO : Cascades should be its own type so that I don't have to add the default always
-                    table.cascades
-                        |> Array.get column
-                        |> Maybe.withDefault []
-                        |> takeTopN
+                    pileTo ( column, row ) table
                         |> validatePileMapper
             in
             mDividedPiles

@@ -49,16 +49,16 @@ or maybeA maybeB =
         else
             Nothing
 
-    try validMonth validYear 6
+    try2 validMonth validYear 6
     --> Just "month"
-    try validMonth validYear 2025
+    try2 validMonth validYear 2025
     --> Just "year"
-    try validMonth validYear 0
+    try2 validMonth validYear 0
     --> Nothing
 
 -}
-try : (a -> Maybe b) -> (a -> Maybe b) -> a -> Maybe b
-try firstTrial secondTrial thing =
+try2 : (a -> Maybe b) -> (a -> Maybe b) -> a -> Maybe b
+try2 firstTrial secondTrial thing =
     case firstTrial thing of
         Just something ->
             Just something
@@ -69,9 +69,9 @@ try firstTrial secondTrial thing =
 
 try3 : (a -> Maybe b) -> (a -> Maybe b) -> (a -> Maybe b) -> a -> Maybe b
 try3 firstTrial secondTrial thirdTrial =
-    try (try firstTrial secondTrial) thirdTrial
+    try2 (try2 firstTrial secondTrial) thirdTrial
 
 
 try4 : (a -> Maybe b) -> (a -> Maybe b) -> (a -> Maybe b) -> (a -> Maybe b) -> a -> Maybe b
 try4 firstTrial secondTrial thirdTrial fourthTrial =
-    try (try3 firstTrial secondTrial thirdTrial) fourthTrial
+    try2 (try3 firstTrial secondTrial thirdTrial) fourthTrial

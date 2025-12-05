@@ -27,6 +27,7 @@ type alias Game =
     , state : State
     , lastMouseDown : Time.Posix
     , doubleClickLast : Bool
+    , focusedCard : Maybe ( CardLoc, Card )
     }
 
 
@@ -41,7 +42,12 @@ new deck =
         table =
             Table.new 4 8
     in
-    Game (Table.View.deal table deck) Ready (Time.millisToPosix 0) False
+    { table = Table.View.deal table deck
+    , state = Ready
+    , lastMouseDown = Time.millisToPosix 0
+    , doubleClickLast = False
+    , focusedCard = Nothing
+    }
 
 
 startMove : CardLoc -> Card -> Position -> Game -> Game
@@ -310,7 +316,7 @@ endMove mTableLoc game =
             let
                 theMove =
                     case mTableLoc of
-                        Just (TableCascade column) ->
+                        Just (TableCascade column _) ->
                             if validToCascade game.table move column then
                                 Move.toCascade column game.table move
 
