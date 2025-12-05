@@ -365,11 +365,23 @@ cardView game cardLoc card =
                 , left (px (card.position |> Tuple.first))
                 ]
 
-        validPile column row =
+        getPile column row =
             game.table
                 |> Table.pileTo ( column, row )
                 |> Tuple.first
-                |> Table.validPile
+
+        pileTuple pile =
+            ( pile, pile )
+
+        validPileDepth row pile =
+            List.length pile <= Game.maxPileDepth row game.table
+
+        -- A valid pile is both in order and of a movable depth
+        validPile column row =
+            getPile column row
+                |> pileTuple
+                |> Tuple.mapBoth Table.validPile (validPileDepth row)
+                |> (==) ( True, True )
 
         hoverOnCard =
             case game.focusedCard of

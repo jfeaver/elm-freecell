@@ -3,6 +3,7 @@ module Game exposing
     , State(..)
     , autoMove
     , endMove
+    , maxPileDepth
     , new
     , startMove
     , updateMove
@@ -149,6 +150,7 @@ autoMove game =
 
                 moveToCascade _ =
                     -- if a pile has a matching cascade then move to cascade
+                    -- FIXME: automove from foundation to cascade might be broken
                     maybeCascade Nothing
                         |> Maybe.map (\( _, column ) -> Move.toCascade column game.table move)
 
@@ -173,8 +175,8 @@ autoMove game =
 
 {-| The max function takes the number of empty cascades and then the number of empty cells and returns the maximum number of cards you can move
 -}
-maxPileDepth : (Int -> Int -> Int) -> Table -> Int
-maxPileDepth maxFn table =
+maxPileDepthAlgorithm : (Int -> Int -> Int) -> Table -> Int
+maxPileDepthAlgorithm maxFn table =
     let
         emptyCascades =
             Table.emptyCascades table
@@ -183,6 +185,27 @@ maxPileDepth maxFn table =
             Table.emptyCells table
     in
     maxFn emptyCascades emptyCells
+
+
+{-| This is intended to be used as the first argument to `maxPileDepthAlgorithm`. We only ever don't use this algorithm when the player is finalizing a stack move to an empty cascade (See validPileDepthOnMoveToEmptyCascade).
+-}
+maxCascadesPileDepth : Table.Row -> Int -> Int -> Int
+maxCascadesPileDepth row emptyCascades emptyCells =
+    if row == 0 then
+        -- Picking up a full cascade shouldn't count the active cascade as an empty one
+        2 ^ (emptyCascades - 1) * (emptyCells + 1)
+
+    else
+        2 ^ emptyCascades * (emptyCells + 1)
+
+
+{-| Given the row that you're picking up from (since picking from row 0 creates an empty
+-| cascade that shouldn't be counted) and the table state, this returns the maximum number
+-| of cards in a pile that may be moved at once.
+-}
+maxPileDepth : Table.Row -> Table -> Int
+maxPileDepth row table =
+    maxPileDepthAlgorithm (maxCascadesPileDepth row) table
 
 
 pickMovablePile : CardLoc -> Game -> Maybe ( List Card, Table )
@@ -194,20 +217,15 @@ pickMovablePile cardLoc game =
 maybePileMove : CardLoc -> ( List Card, Table ) -> Maybe ( List Card, Table )
 maybePileMove cardLoc ( pile, table ) =
     let
-        maxCardsToMove emptyCascades emptyCells =
+        moveMax =
             case cardLoc of
                 CascadeLoc _ row ->
-                    if row == 0 then
-                        -- Picking up a full cascade shouldn't count the active cascade as an empty one
-                        2 ^ (emptyCascades - 1) * (emptyCells + 1)
-
-                    else
-                        2 ^ emptyCascades * (emptyCells + 1)
+                    maxPileDepth row table
 
                 _ ->
                     1
     in
-    if List.length pile <= maxPileDepth maxCardsToMove table then
+    if List.length pile <= moveMax then
         Just ( pile, table )
 
     else
@@ -229,7 +247,7 @@ validPileDepthOnMoveToEmptyCascade table move =
             else
                 2 ^ (emptyCascades - 1) * (emptyCells + 1)
     in
-    Move.pileDepth move <= maxPileDepth maxCardsToMove table
+    Move.pileDepth move <= maxPileDepthAlgorithm maxCardsToMove table
 
 
 {-| For moving onto cascades
