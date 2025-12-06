@@ -5,6 +5,7 @@ import Browser exposing (Document)
 import Browser.Dom exposing (Element)
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.View
+import Cascade exposing (Column, Row)
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck exposing (Deck)
 import Game exposing (Game)
@@ -16,7 +17,7 @@ import Html.Styled.Events exposing (onClick)
 import Move
 import Position
 import Random
-import Table exposing (CardLoc(..), Cell, Column, Table)
+import Table exposing (CardLoc(..), Cell, Table)
 import Table.View
 import Task
 import Time

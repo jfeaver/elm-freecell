@@ -13,12 +13,13 @@ import Array
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color
 import Card.Rank
+import Cascade exposing (Column, Row)
 import Deck exposing (Deck)
 import List.Extra
 import Maybe.Extra
 import Move exposing (Move)
 import Position exposing (Position)
-import Table exposing (CardLoc(..), Cell, Column, Table)
+import Table exposing (CardLoc(..), Cell, Table)
 import Table.View exposing (TableLoc(..))
 import Time
 
@@ -110,7 +111,7 @@ autoMove game =
                 tableCellsIndices =
                     List.range 0 (game.table.cellsCount - 1)
 
-                validCascadeFolder : Table.Column -> Maybe ( Bool, Table.Column ) -> Maybe ( Bool, Table.Column )
+                validCascadeFolder : Column -> Maybe ( Bool, Column ) -> Maybe ( Bool, Column )
                 validCascadeFolder column mCascade =
                     if Move.startsFromCascade column move then
                         -- Avoid moving to the current location
@@ -189,7 +190,7 @@ maxPileDepthAlgorithm maxFn table =
 
 {-| This is intended to be used as the first argument to `maxPileDepthAlgorithm`. We only ever don't use this algorithm when the player is finalizing a stack move to an empty cascade (See validPileDepthOnMoveToEmptyCascade).
 -}
-maxCascadesPileDepth : Table.Row -> Int -> Int -> Int
+maxCascadesPileDepth : Row -> Int -> Int -> Int
 maxCascadesPileDepth row emptyCascades emptyCells =
     if row == 0 then
         -- Picking up a full cascade shouldn't count the active cascade as an empty one
@@ -203,7 +204,7 @@ maxCascadesPileDepth row emptyCascades emptyCells =
 -| cascade that shouldn't be counted) and the table state, this returns the maximum number
 -| of cards in a pile that may be moved at once.
 -}
-maxPileDepth : Table.Row -> Table -> Int
+maxPileDepth : Row -> Table -> Int
 maxPileDepth row table =
     maxPileDepthAlgorithm (maxCascadesPileDepth row) table
 

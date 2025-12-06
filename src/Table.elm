@@ -1,9 +1,7 @@
 module Table exposing
     ( CardLoc(..)
     , Cell
-    , Column
     , Depth
-    , Row
     , Table
     , cascadeEmpty
     , cellEmpty
@@ -19,6 +17,7 @@ import Array exposing (Array)
 import Card exposing (Card, Suit(..))
 import Card.Color
 import Card.Rank
+import Cascade exposing (Column, Row)
 import List.Extra
 import Maybe.Extra
 
@@ -37,14 +36,6 @@ type alias Table =
     , hearts : Foundation
     , spades : Foundation
     }
-
-
-type alias Column =
-    Int
-
-
-type alias Row =
-    Int
 
 
 type alias Cell =

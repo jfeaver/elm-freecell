@@ -21,13 +21,14 @@ import Array exposing (Array)
 import Basics.Extra exposing (divMod)
 import Card exposing (Card, Suit(..))
 import Card.View
+import Cascade exposing (Column, Row)
 import Css exposing (border3, borderRadius, hex, px, solid)
 import Deck exposing (Deck)
 import Html.Styled exposing (Attribute)
 import Html.Styled.Attributes exposing (css)
 import Maybe.Extra
 import Position exposing (Position)
-import Table exposing (CardLoc(..), Cell, Column, Depth, Row, Table)
+import Table exposing (CardLoc(..), Cell, Depth, Table)
 import UI
 
 
