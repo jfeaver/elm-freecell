@@ -7,12 +7,11 @@ import Array
 import Card exposing (Card, Rank(..), Suit(..))
 import Deck
 import Expect
-import Game exposing (Game, State(..))
+import Game exposing (State(..))
 import Move
 import Table exposing (CardLoc(..))
 import Table.View exposing (TableLoc(..))
 import Test exposing (..)
-import Time
 
 
 pickUps : Test
@@ -93,7 +92,7 @@ putDowns =
                         { t | cascades = Array.set 0 [] t.cascades }
 
                     tableLoc =
-                        TableCascade 0
+                        TableCascade 0 0
 
                     move =
                         PlayerMove (Move.new pickedFrom pickedCard pickedPile ( 0, 0 ))
