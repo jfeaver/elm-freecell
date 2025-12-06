@@ -17,6 +17,7 @@ type Rank
     | Jack
     | Queen
     | King
+    | Infinite
 
 
 type Suit

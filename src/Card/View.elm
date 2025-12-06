@@ -46,6 +46,9 @@ rankName rank =
         King ->
             "K"
 
+        Infinite ->
+            ""
+
 
 suitName : Suit -> String
 suitName suit =

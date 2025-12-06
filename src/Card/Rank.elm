@@ -43,7 +43,10 @@ increment rank =
             King
 
         King ->
-            Ace
+            Infinite
+
+        Infinite ->
+            Infinite
 
 
 doIncrementN : Int -> Int -> Rank -> Rank
@@ -101,6 +104,9 @@ decrement rank =
 
         King ->
             Queen
+
+        Infinite ->
+            Infinite
 
 
 decrementCard : Card -> Maybe Card
