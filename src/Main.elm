@@ -8,13 +8,14 @@ import Card.View
 import Cascade exposing (Column, Row)
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck exposing (Deck)
-import Game exposing (Game)
+import Game exposing (Game, State(..))
 import Html.Events exposing (onMouseEnter, onMouseLeave)
 import Html.Events.Extra.Mouse exposing (Event, onDown, onMove, onUp)
 import Html.Styled as Html exposing (Html, button, div, text)
 import Html.Styled.Attributes exposing (css, fromUnstyled, id)
 import Html.Styled.Events exposing (onClick)
 import Move
+import Pile exposing (Pile)
 import Position
 import Random
 import Table exposing (CardLoc(..), Cell, Table)
@@ -75,6 +76,7 @@ update msg model =
             ( model, startGame )
 
         DoubleClick ->
+            -- FIXME: Manually Focus next card if mouse is over it? Maybe add mouseover and see what it does.
             case model of
                 InGame game ->
                     let
@@ -311,20 +313,91 @@ foundations game =
         ]
 
 
+
+{-
+   TODO - On hover-movable pile:
+   {
+       box-shadow: 0px 0px 4px 3px greenyellow;
+       border-radius: 5px;
+       top: __
+       z-index: __
+   }
+-}
+
+
+unfocusedPileIndicator : ( Row, Pile ) -> Float -> Html Msg
+unfocusedPileIndicator ( rowStart, pile ) cascadeOffset =
+    let
+        pileDepth =
+            List.length pile
+
+        pileHeight =
+            (pileDepth |> toFloat) * Table.View.pileSpacing + Card.View.height
+
+        indicatorTop =
+            rowStart
+                |> toFloat
+                |> (*) Table.View.pileSpacing
+                |> (+) Table.View.cascadesTop
+    in
+    div
+        [ css
+            [ position absolute
+            , top (px indicatorTop)
+            , left (px cascadeOffset)
+            , Css.height (px pileHeight)
+            , Css.width (px Card.View.width)
+
+            -- TODO: Use UI for sizes here
+            , Css.boxShadow5 (px -4) (px 0) (px 0) (px -1) (Css.rgb 95 199 199)
+            , Css.borderRadius (px 5)
+            , zIndex (int rowStart)
+            ]
+        ]
+        []
+
+
 cascade : Game -> Float -> ( Column, List Card ) -> Html Msg
 cascade game cascadesOffset ( column, cards ) =
-    div []
-        (div
-            [ css
-                [ position absolute
-                , top (px Table.View.cascadesTop)
-                , left (px (cascadesOffset + toFloat column * (Card.View.width + Table.View.padding)))
+    let
+        pile =
+            Pile.fromCascade cards
+
+        cascadeOffset =
+            cascadesOffset + toFloat column * (Card.View.width + Table.View.padding)
+
+        cardMark =
+            div
+                [ css
+                    [ position absolute
+                    , top (px Table.View.cascadesTop)
+                    , left (px cascadeOffset)
+                    ]
+                , Table.View.cardMark
                 ]
-            , Table.View.cardMark
+                []
+
+        indicators =
+            case game.state of
+                PlayerMove move ->
+                    if Move.startsFromCascade column move then
+                        [ cardMark ]
+
+                    else
+                        [ cardMark
+                        , unfocusedPileIndicator pile cascadeOffset
+                        ]
+
+                _ ->
+                    [ cardMark
+                    , unfocusedPileIndicator pile cascadeOffset
+                    ]
+    in
+    div [] <|
+        List.concat
+            [ indicators
+            , List.indexedMap (cascadeCardView game (List.length cards) column) cards
             ]
-            []
-            :: List.indexedMap (cascadeCardView game (List.length cards) column) cards
-        )
 
 
 cascades : Game -> Html Msg
@@ -366,22 +439,22 @@ cardView game cardLoc card =
                 , left (px (card.position |> Tuple.first))
                 ]
 
-        getPile column row =
+        getStack column row =
             game.table
-                |> Table.pileTo ( column, row )
+                |> Table.stackTo ( column, row )
                 |> Tuple.first
 
-        pileTuple pile =
-            ( pile, pile )
+        twoTupleFrom thing =
+            ( thing, thing )
 
         validPileDepth row pile =
             List.length pile <= Game.maxPileDepth row game.table
 
         -- A valid pile is both in order and of a movable depth
         validPile column row =
-            getPile column row
-                |> pileTuple
-                |> Tuple.mapBoth Table.validPile (validPileDepth row)
+            getStack column row
+                |> twoTupleFrom
+                |> Tuple.mapBoth Pile.validPile (validPileDepth row)
                 |> (==) ( True, True )
 
         hoverOnCard =
@@ -390,6 +463,7 @@ cardView game cardLoc card =
                     case focusedCardLoc of
                         CascadeLoc column row ->
                             if (cardLoc == focusedCardLoc) && validPile column row then
+                                -- FIXME: when valid pile is the entire cascade and is the exact number of movable cards then the top card does not show a pointer
                                 css
                                     [ hover [ cursor pointer ]
                                     ]

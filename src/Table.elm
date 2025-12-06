@@ -9,17 +9,16 @@ module Table exposing
     , emptyCells
     , new
     , pickPile
-    , pileTo
-    , validPile
+    , stackTo
     )
 
 import Array exposing (Array)
 import Card exposing (Card, Suit(..))
-import Card.Color
 import Card.Rank
 import Cascade exposing (Column, Row)
 import List.Extra
 import Maybe.Extra
+import Pile exposing (Pile, validPile)
 
 
 type alias Foundation =
@@ -66,23 +65,8 @@ new cellsCount cascadesCount =
     }
 
 
-validPilePair : Card -> Card -> Bool
-validPilePair top second =
-    Card.Rank.increment top.rank == second.rank && Card.Color.notColor (Card.Color.fromCard top) == Card.Color.fromCard second
-
-
-validPile : List Card -> Bool
-validPile cards =
-    case cards of
-        top :: second :: others ->
-            validPilePair top second && validPile (second :: others)
-
-        _ ->
-            True
-
-
-pileHeight : List Card -> Row -> Int
-pileHeight cards row =
+stackHeight : List Card -> Row -> Int
+stackHeight cards row =
     let
         columnDepth =
             List.length cards
@@ -90,19 +74,19 @@ pileHeight cards row =
     columnDepth - row
 
 
-{-| Creates two piles from the card's cascade and returns them as two lists in a tuple.
--| The first list is the card specified and all cards below it. The second list is the
--| cards left behind in the cascade.
+{-| Creates two stacks from the card's cascade and returns them as two lists in a tuple.
+-| The first stack is the card specified and all cards below it. The second stack is the
+-| rest of the cards above the specified card in the cascade.
 -}
-pileTo : ( Column, Row ) -> Table -> ( List Card, List Card )
-pileTo ( column, row ) table =
+stackTo : ( Column, Row ) -> Table -> ( List Card, List Card )
+stackTo ( column, row ) table =
     table.cascades
         |> Array.get column
         |> Maybe.withDefault []
-        |> (\cards -> List.Extra.partitionN (pileHeight cards row) cards)
+        |> (\cards -> List.Extra.partitionN (stackHeight cards row) cards)
 
 
-pickPile : CardLoc -> Table -> Maybe ( List Card, Table )
+pickPile : CardLoc -> Table -> Maybe ( Pile, Table )
 pickPile cardLoc table =
     case cardLoc of
         CascadeLoc column row ->
@@ -115,9 +99,9 @@ pickPile cardLoc table =
                         Nothing
 
                 -- Generates data like: Maybe (pile, leftBehind)
-                mDividedPiles : Maybe ( List Card, List Card )
+                mDividedPiles : Maybe ( Pile, List Card )
                 mDividedPiles =
-                    pileTo ( column, row ) table
+                    stackTo ( column, row ) table
                         |> validatePileMapper
             in
             mDividedPiles

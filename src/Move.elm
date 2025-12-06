@@ -19,6 +19,7 @@ import Array
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color exposing (CardColor(..))
 import Cascade exposing (Column)
+import Pile exposing (Pile)
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Cell, Table)
 import Table.View
@@ -28,7 +29,7 @@ type Move
     = Move
         { from : CardLoc
         , to : CardLoc
-        , pile : List Card
+        , pile : Pile
         , topCardStart : Position
         , mouseStart : Position
         , pileDepth : Int
@@ -38,7 +39,7 @@ type Move
         }
 
 
-new : CardLoc -> Card -> List Card -> Position -> Move
+new : CardLoc -> Card -> Pile -> Position -> Move
 new cardLoc topCard pile position =
     let
         zIndexInHand depth card =

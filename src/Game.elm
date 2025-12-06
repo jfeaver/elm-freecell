@@ -240,6 +240,7 @@ cascade either.
 -}
 validPileDepthOnMoveToEmptyCascade : Table -> Move -> Bool
 validPileDepthOnMoveToEmptyCascade table move =
+    -- FIXME: When moving five cards to an empty cascade and there are four free cells then I can't move the stack
     let
         maxCardsToMove emptyCascades emptyCells =
             if Move.isFullCascade move then

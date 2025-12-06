@@ -11,6 +11,7 @@ module Table.View exposing
     , locFor
     , padding
     , pileDepthOffset
+    , pileSpacing
     , positionFor
     , topOffset
     , width
