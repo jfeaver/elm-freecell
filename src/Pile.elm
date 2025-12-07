@@ -31,6 +31,13 @@ validPile cards =
 pileFinder : Row -> List Card -> Pile -> ( Row, Pile )
 pileFinder row remaining pile_ =
     case remaining of
+        top :: second :: [] ->
+            if validPilePair top second then
+                ( row - 1, List.append pile_ [ top, second ] )
+
+            else
+                ( row, List.append pile_ [ top ] )
+
         top :: second :: others ->
             if validPilePair top second then
                 pileFinder (row - 1) (second :: others) (List.append pile_ [ top ])
