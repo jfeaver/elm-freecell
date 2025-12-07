@@ -386,7 +386,7 @@ unfocusedPileIndicator ( rowStart, pile ) cascadeOffset =
             List.length pile
 
         pileHeight =
-            (pileDepth |> toFloat) * Table.View.stackSpacing + Card.View.height
+            (pileDepth - 1 |> toFloat) * Table.View.stackSpacing + Card.View.height
 
         indicatorTop =
             rowStart
@@ -441,21 +441,21 @@ cascade game cascadesOffset ( column, cards ) =
                 |> Maybe.map (focusedPileIndicator pile)
                 |> Maybe.withDefault []
 
+        mPileIndicator =
+            if List.length (pile |> Tuple.second) > 1 then
+                Just (unfocusedPileIndicator pile cascadeOffset)
+
+            else
+                Nothing
+
+        basicIndicators =
+            [ cardMark ]
+
         indicators =
-            case game.state of
-                PlayerMove move ->
-                    if Move.startsFromCascade column move then
-                        [ cardMark ]
-
-                    else
-                        [ cardMark
-                        , unfocusedPileIndicator pile cascadeOffset
-                        ]
-
-                _ ->
-                    [ cardMark
-                    , unfocusedPileIndicator pile cascadeOffset
-                    ]
+            mPileIndicator
+                |> Maybe.map (\indicator -> [ indicator ])
+                |> Maybe.withDefault []
+                |> List.append basicIndicators
     in
     div [] <|
         List.concat

@@ -36,7 +36,7 @@ pileFinder row remaining pile_ =
                 pileFinder (row - 1) (second :: others) (List.append pile_ [ top ])
 
             else
-                ( row, pile_ )
+                ( row, List.append pile_ [ top ] )
 
         _ ->
             ( row, pile_ )
