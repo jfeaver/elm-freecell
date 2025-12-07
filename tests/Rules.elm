@@ -9,8 +9,7 @@ import Deck
 import Expect
 import Game exposing (State(..))
 import Move
-import Table exposing (CardLoc(..))
-import Table.View exposing (TableLoc(..))
+import Table exposing (CardLoc(..), TableLoc(..))
 import Test exposing (..)
 
 

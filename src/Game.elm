@@ -19,8 +19,8 @@ import List.Extra
 import Maybe.Extra
 import Move exposing (Move)
 import Position exposing (Position)
-import Table exposing (CardLoc(..), Cell, Table)
-import Table.View exposing (TableLoc(..))
+import Table exposing (CardLoc(..), Cell, Table, TableLoc(..))
+import Table.View
 import Time
 
 

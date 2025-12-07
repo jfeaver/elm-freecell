@@ -69,7 +69,7 @@ update mousePosition (Move move) =
                 | position =
                     positionDiff
                         |> Position.add move.topCardStart
-                        |> Position.add ( 0, Table.View.pileDepthOffset (pileDepth (Move move) - depth - 1) )
+                        |> Position.add ( 0, Table.View.stackOffset (pileDepth (Move move) - depth - 1) )
             }
 
         updatedPile =
@@ -111,7 +111,7 @@ finalize table (Move move) =
                     { card
                         | position =
                             updatedPosition
-                                |> Position.add ( 0, Table.View.pileDepthOffset (pileDepth (Move move) - depth - 1) )
+                                |> Position.add ( 0, Table.View.stackOffset (pileDepth (Move move) - depth - 1) )
                         , zIndex = updatedZIndex + pileDepth (Move move) - depth - 1
                     }
 

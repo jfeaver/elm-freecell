@@ -3,13 +3,17 @@ module Table exposing
     , Cell
     , Depth
     , Table
+    , TableLoc(..)
+    , cascadeDepth
     , cascadeEmpty
     , cellEmpty
     , emptyCascades
     , emptyCells
+    , getTableCard
     , new
     , pickPile
     , stackTo
+    , tableCardLocToCardLoc
     )
 
 import Array exposing (Array)
@@ -52,6 +56,12 @@ type CardLoc
     | FoundationLoc Suit
 
 
+type TableLoc
+    = TableCascade Column Row
+    | TableCell Cell
+    | TableFoundation Suit
+
+
 new : Int -> Int -> Table
 new cellsCount cascadesCount =
     { cells = Array.initialize cellsCount (always Nothing)
@@ -84,6 +94,13 @@ stackTo ( column, row ) table =
         |> Array.get column
         |> Maybe.withDefault []
         |> (\cards -> List.Extra.partitionN (stackHeight cards row) cards)
+
+
+cascadeDepth : Column -> Table -> Maybe Int
+cascadeDepth column table =
+    table.cascades
+        |> Array.get column
+        |> Maybe.map List.length
 
 
 pickPile : CardLoc -> Table -> Maybe ( Pile, Table )
@@ -143,6 +160,55 @@ getCell : Cell -> Table -> Maybe Card
 getCell cell { cells } =
     Array.get cell cells
         |> Maybe.Extra.dig
+
+
+tableCardLocToCardLoc : TableLoc -> CardLoc
+tableCardLocToCardLoc tableLoc =
+    case tableLoc of
+        TableCascade column row ->
+            CascadeLoc column row
+
+        TableCell cell ->
+            CellLoc cell
+
+        TableFoundation foundation ->
+            FoundationLoc foundation
+
+
+getTableCard : TableLoc -> Table -> Maybe Card
+getTableCard tableLoc table =
+    let
+        getStackCard : Row -> List Card -> Maybe Card
+        getStackCard row stack =
+            if row == 0 then
+                List.head stack
+
+            else
+                List.tail stack
+                    |> Maybe.andThen (\rest -> getStackCard (row - 1) rest)
+    in
+    case tableLoc of
+        TableCascade column row ->
+            table.cascades
+                |> Array.get column
+                |> Maybe.andThen (getStackCard row)
+
+        TableCell cell ->
+            getCell cell table
+
+        TableFoundation foundation ->
+            case foundation of
+                Diamonds ->
+                    table.diamonds
+
+                Clubs ->
+                    table.clubs
+
+                Hearts ->
+                    table.hearts
+
+                Spades ->
+                    table.spades
 
 
 cellEmpty : Cell -> Table -> Bool

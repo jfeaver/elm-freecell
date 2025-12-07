@@ -1,6 +1,5 @@
 module Table.View exposing
-    ( TableLoc(..)
-    , backgroundHex
+    ( backgroundHex
     , cardMark
     , cascadesMargin
     , cascadesTop
@@ -10,9 +9,9 @@ module Table.View exposing
     , horizontalOffset
     , locFor
     , padding
-    , pileDepthOffset
-    , pileSpacing
     , positionFor
+    , stackOffset
+    , stackSpacing
     , topOffset
     , width
     , zIndexFor
@@ -29,14 +28,8 @@ import Html.Styled exposing (Attribute)
 import Html.Styled.Attributes exposing (css)
 import Maybe.Extra
 import Position exposing (Position)
-import Table exposing (CardLoc(..), Cell, Depth, Table)
+import Table exposing (CardLoc(..), Depth, Table, TableLoc(..))
 import UI
-
-
-type TableLoc
-    = TableCascade Column Row
-    | TableCell Cell
-    | TableFoundation Suit
 
 
 width : Float
@@ -119,15 +112,15 @@ cascadesTop =
 
 {-| pixels between the top of one card and the top of the next card in a pile
 -}
-pileSpacing : Float
-pileSpacing =
+stackSpacing : Float
+stackSpacing =
     25 |> UI.zoomedR
 
 
-pileDepthOffset : Depth -> Float
-pileDepthOffset depth =
+stackOffset : Depth -> Float
+stackOffset depth =
     toFloat depth
-        * pileSpacing
+        * stackSpacing
         |> UI.roundToHalf
 
 
@@ -140,7 +133,7 @@ positionFor table cardLoc =
                     cascadesMargin table + toFloat column * (Card.View.width + padding)
 
                 top =
-                    cascadesTop + toFloat row * pileSpacing
+                    cascadesTop + toFloat row * stackSpacing
             in
             ( left, top )
 
@@ -168,15 +161,26 @@ cascadesLocFor table ( left, top ) =
             left - xMargin
 
         y =
-            top - cascadesTop - 21.5
+            top - cascadesTop
 
         ( column, columnX ) =
             divMod (x |> round) (Card.View.width + padding |> round)
 
+        maxPointerRow =
+            (y / stackSpacing) |> floor
+
+        cascadeMaxRow =
+            Table.cascadeDepth column table
+                |> Maybe.map (\depth -> depth - 1)
+                |> Maybe.withDefault maxPointerRow
+
         row =
-            (y / pileSpacing) |> floor
+            min maxPointerRow cascadeMaxRow
+
+        bottomOfLastCard =
+            ((row |> toFloat) * stackSpacing) + Card.View.height
     in
-    if y < 0 || x < 0 || left > (width - xMargin - padding) then
+    if y < 0 || y > bottomOfLastCard || x < 0 || left > (width - xMargin - padding) then
         Nothing
 
     else if (columnX |> toFloat) > Card.View.width then
@@ -325,7 +329,7 @@ expandedPlayHeight table =
             Array.foldl doLongestCascade 0 table.cascades
 
         playExtension =
-            cascadesTop + toFloat longestCascade * pileSpacing + doublePadding + Card.View.height - height
+            cascadesTop + toFloat longestCascade * stackSpacing + doublePadding + Card.View.height - height
     in
     if playExtension > 0 then
         playExtension

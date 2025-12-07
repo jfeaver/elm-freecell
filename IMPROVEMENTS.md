@@ -1,11 +1,14 @@
-- Card positions could be based on their pile position rather than individually positioned
 - 50 images are loaded separately!! Let's embed the SVG directly?
 - CSS animations/animation frames (animate cancelled moves and auto moves)
 - Error messages (Can't do that because ...)
-- mouse pointer style on hover
-- highlight parent cards on hover
 - Undo
 - Seeded games (maybe an easy win game to make dev easier)
 - Win/Loss conditions and messages
 - hitbox drop collisions (versus point collision right now)
 - ignore right click
+- highlight any possible card location other than free cells
+- pulse possible card locations twice and then stop
+- The card highlight feels like it sinks the card rather than drawing it forward
+- The card highlight is a suggestion so it shouldn't highlight a card directly above the focused card
+- Add focused pile indicator showing the maximum movable pile
+- When I'm tired, it's hard to see the transition point between a highlighted card and a pile indicator

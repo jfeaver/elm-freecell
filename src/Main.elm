@@ -16,7 +16,7 @@ import Html.Styled.Attributes exposing (css, fromUnstyled, id)
 import Html.Styled.Events exposing (onClick)
 import Move
 import Pile exposing (Pile)
-import Position
+import Position exposing (Position)
 import Random
 import Table exposing (CardLoc(..), Cell, Table)
 import Table.View
@@ -42,14 +42,14 @@ type Model
 type Msg
     = SetGame Deck
     | NewGame
-    | DoubleClick
+    | DoubleClick Position
     | MouseDown ( CardLoc, Card ) Event
     | FocusCard ( CardLoc, Card )
     | DefocusCard
     | MouseMove Event
     | MouseUp Event
     | EndMove (Result Browser.Dom.Error ( Element, Event ))
-    | DetectDoubleClick Time.Posix
+    | DetectDoubleClick Position (Result Browser.Dom.Error ( Element, Time.Posix ))
 
 
 startGame : Cmd Msg
@@ -60,6 +60,43 @@ startGame =
 init : ( Model, Cmd Msg )
 init =
     ( MainMenu, startGame )
+
+
+doubleClickUpdate : Game -> Position -> ( Model, Cmd Msg )
+doubleClickUpdate game position =
+    let
+        automoveGame =
+            game
+                |> Game.autoMove
+                |> (\updatedGame -> { updatedGame | doubleClickLast = True })
+
+        -- see if click is a cascade location
+        -- check if that cascade location is the last cascade card
+        -- focus on that card
+        mNextCardLoc =
+            Table.View.locFor automoveGame.table position
+
+        locatedTableCard tCardLoc =
+            automoveGame.table
+                |> Table.getTableCard tCardLoc
+                |> Maybe.map (\card -> ( Table.tableCardLocToCardLoc tCardLoc, card ))
+
+        mNextLocatedCard =
+            mNextCardLoc
+                |> Maybe.andThen locatedTableCard
+
+        refocusCard card =
+            update (FocusCard card) (InGame automoveGame)
+
+        defocus =
+            update DefocusCard (InGame automoveGame)
+    in
+    case mNextLocatedCard of
+        Just locatedCard ->
+            refocusCard locatedCard
+
+        Nothing ->
+            defocus
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -75,20 +112,21 @@ update msg model =
         NewGame ->
             ( model, startGame )
 
-        DoubleClick ->
-            -- FIXME: Manually Focus next card if mouse is over it? Maybe add mouseover and see what it does.
+        DoubleClick position ->
             case model of
                 InGame game ->
-                    let
-                        updatedGame =
-                            Game.autoMove game
-                    in
-                    ( InGame { updatedGame | doubleClickLast = True }, Cmd.none )
+                    doubleClickUpdate game position
 
                 _ ->
                     ( model, Cmd.none )
 
         MouseDown ( cardLoc, card ) { clientPos, button } ->
+            -- Should do only these things:
+            -- Record that a click happened and the position where it happened (maybe just a recycled DetectDoubleClick)
+            --
+            -- Elsewhere:
+            -- If some threshold of pixels are moved (maybe 2?) and mouse up event is not received then we start a hand move in mouse move
+            -- If some threshold of time goes by (maybe 500 ms like double click threshold) and mouse up event is not received and hand move is not started then we start a hand move
             case model of
                 InGame game ->
                     let
@@ -99,8 +137,14 @@ update msg model =
 
                                 _ ->
                                     game
+
+                        getTableElement =
+                            Browser.Dom.getElement "table"
+
+                        task =
+                            Task.map2 (\el time -> ( el, time )) getTableElement Time.now
                     in
-                    ( InGame updatedGame, Task.perform DetectDoubleClick Time.now )
+                    ( InGame updatedGame, Task.attempt (DetectDoubleClick clientPos) task )
 
                 _ ->
                     ( model, Cmd.none )
@@ -143,22 +187,22 @@ update msg model =
 
         MouseUp event ->
             let
-                getElement =
+                getTableElement =
                     Browser.Dom.getElement "table"
 
                 elementWithEvent el =
                     ( el, event )
             in
-            ( model, Task.attempt EndMove <| Task.map elementWithEvent getElement )
+            ( model, Task.attempt EndMove <| Task.map elementWithEvent getTableElement )
 
         EndMove result ->
             case model of
                 InGame game ->
                     case result of
-                        Ok ( element, event ) ->
+                        Ok ( tableEl, event ) ->
                             let
                                 tablePosition =
-                                    ( element.element.x, element.element.y )
+                                    ( tableEl.element.x, tableEl.element.y )
 
                                 mouseUpTablePosition =
                                     Position.diff tablePosition event.clientPos
@@ -177,7 +221,7 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        DetectDoubleClick time ->
+        DetectDoubleClick position (Ok ( tableEl, time )) ->
             case model of
                 InGame game ->
                     let
@@ -186,15 +230,25 @@ update msg model =
 
                         updatedGame =
                             { game | lastMouseDown = time, doubleClickLast = False }
+
+                        tablePosition =
+                            ( tableEl.element.x, tableEl.element.y )
+
+                        clickTablePosition =
+                            Position.diff tablePosition position
                     in
                     if mouseDownDiff <= 500 && not game.doubleClickLast then
-                        update DoubleClick (InGame updatedGame)
+                        update (DoubleClick clickTablePosition) (InGame updatedGame)
 
                     else
                         ( InGame updatedGame, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
+
+        DetectDoubleClick _ _ ->
+            -- If error finding table element... do nothing.
+            ( model, Cmd.none )
 
 
 view : Model -> Document Msg
@@ -332,12 +386,12 @@ unfocusedPileIndicator ( rowStart, pile ) cascadeOffset =
             List.length pile
 
         pileHeight =
-            (pileDepth |> toFloat) * Table.View.pileSpacing + Card.View.height
+            (pileDepth |> toFloat) * Table.View.stackSpacing + Card.View.height
 
         indicatorTop =
             rowStart
                 |> toFloat
-                |> (*) Table.View.pileSpacing
+                |> (*) Table.View.stackSpacing
                 |> (+) Table.View.cascadesTop
     in
     div
@@ -355,6 +409,11 @@ unfocusedPileIndicator ( rowStart, pile ) cascadeOffset =
             ]
         ]
         []
+
+
+focusedPileIndicator : ( Row, Pile ) -> ( CardLoc, Card ) -> List (Html Msg)
+focusedPileIndicator ( row, pile ) ( cardLoc, card ) =
+    []
 
 
 cascade : Game -> Float -> ( Column, List Card ) -> Html Msg
@@ -377,6 +436,11 @@ cascade game cascadesOffset ( column, cards ) =
                 ]
                 []
 
+        focusedPileIndicator_ =
+            game.focusedCard
+                |> Maybe.map (focusedPileIndicator pile)
+                |> Maybe.withDefault []
+
         indicators =
             case game.state of
                 PlayerMove move ->
@@ -395,7 +459,7 @@ cascade game cascadesOffset ( column, cards ) =
     in
     div [] <|
         List.concat
-            [ indicators
+            [ List.append indicators focusedPileIndicator_
             , List.indexedMap (cascadeCardView game (List.length cards) column) cards
             ]
 
@@ -425,9 +489,12 @@ cardView game cardLoc card =
                 [ backgroundImage (url (card |> Card.View.filename))
                 , backgroundSize contain
                 , backgroundRepeat noRepeat
-                , width (px Card.View.width)
-                , height (px Card.View.height)
-                , zIndex (int card.zIndex)
+                ]
+
+        sizing inset =
+            css
+                [ width (px (Card.View.width - inset))
+                , height (px (Card.View.height - inset))
                 ]
 
         positioning =
@@ -437,6 +504,7 @@ cardView game cardLoc card =
                 , top
                     (px (card.position |> Tuple.second))
                 , left (px (card.position |> Tuple.first))
+                , zIndex (int card.zIndex)
                 ]
 
         getStack column row =
@@ -487,9 +555,34 @@ cardView game cardLoc card =
                 |> List.map fromUnstyled
 
         attrs =
-            List.concat [ interaction, [ cardImage, positioning, hoverOnCard ] ]
+            List.concat [ interaction, [ cardImage, positioning, sizing 0, hoverOnCard ] ]
+
+        cardHighlightInset =
+            1
+
+        cardHighlight =
+            -- TODO: Move borderRadius and box shadow to UI size
+            div
+                [ positioning
+                , sizing (cardHighlightInset * 2)
+                , css
+                    [ margin (px cardHighlightInset)
+                    , Css.borderRadius (px (5 - cardHighlightInset))
+                    , Css.boxShadow5 (px 0) (px 0) (px 3) (px 4) (Css.rgb 156 201 227)
+                    ]
+                ]
+                []
+
+        doHighlightCard =
+            game.focusedCard
+                |> Maybe.map (\( _, focusedCard ) -> Pile.validPile [ focusedCard, card ])
+                |> Maybe.withDefault False
     in
-    div attrs []
+    if doHighlightCard then
+        div [] [ div attrs [], cardHighlight ]
+
+    else
+        div attrs []
 
 
 activeMove : Game -> Game.State -> Html Msg
