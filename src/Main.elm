@@ -573,9 +573,17 @@ cardView game cardLoc card =
                 ]
                 []
 
+        isParentOf childLoc parentCardLoc =
+            case parentCardLoc of
+                CascadeLoc column row ->
+                    childLoc == CascadeLoc column (row + 1)
+
+                _ ->
+                    False
+
         doHighlightCard =
             game.focusedCard
-                |> Maybe.map (\( _, focusedCard ) -> Pile.validPile [ focusedCard, card ])
+                |> Maybe.map (\( focusedCardLoc, focusedCard ) -> Pile.validPile [ focusedCard, card ] && not (isParentOf focusedCardLoc cardLoc))
                 |> Maybe.withDefault False
     in
     if doHighlightCard then
