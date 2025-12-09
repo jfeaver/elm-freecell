@@ -180,12 +180,12 @@ getTableCard tableLoc table =
     let
         getStackCard : Row -> List Card -> Maybe Card
         getStackCard row stack =
-            if row == 0 then
+            if row + 1 == List.length stack then
                 List.head stack
 
             else
                 List.tail stack
-                    |> Maybe.andThen (\rest -> getStackCard (row - 1) rest)
+                    |> Maybe.andThen (\rest -> getStackCard row rest)
     in
     case tableLoc of
         TableCascade column row ->

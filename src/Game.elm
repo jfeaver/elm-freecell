@@ -1,12 +1,13 @@
 module Game exposing
     ( Game
+    , MouseDownDetail
     , State(..)
     , autoMove
     , endMove
     , maxPileDepth
     , new
     , startMove
-    , updateMove
+    , updateMouseMove
     )
 
 import Array
@@ -24,10 +25,20 @@ import Table.View
 import Time
 
 
+{-| The position here is absolute. Since it is used for starting a drag and drop Move and that isn't relative to the table element.
+-}
+type alias MouseDownDetail =
+    { time : Time.Posix
+    , position : Position
+    , locatedCard : ( CardLoc, Card )
+    , mouseUpReceived : Bool
+    }
+
+
 type alias Game =
     { table : Table
     , state : State
-    , lastMouseDown : Time.Posix
+    , lastMouseDown : Maybe MouseDownDetail
     , doubleClickLast : Bool
     , focusedCard : Maybe ( CardLoc, Card )
     }
@@ -46,19 +57,19 @@ new deck =
     in
     { table = Table.View.deal table deck
     , state = Ready
-    , lastMouseDown = Time.millisToPosix 0
+    , lastMouseDown = Nothing
     , doubleClickLast = False
     , focusedCard = Nothing
     }
 
 
-startMove : CardLoc -> Card -> Position -> Game -> Game
-startMove cardLoc card position game =
+startMove : ( CardLoc, Card ) -> Position -> Game -> Game
+startMove ( cardLoc, card ) position game =
     case game.state of
         Ready ->
             let
                 move pile =
-                    Move.new cardLoc card pile position
+                    Move.new ( cardLoc, card ) pile position
             in
             case pickMovablePile cardLoc game of
                 Just ( pile, table ) ->
@@ -71,11 +82,32 @@ startMove cardLoc card position game =
             game
 
 
-updateMove : Position -> Game -> Game
-updateMove position game =
+updateMouseMove : Position -> Game -> Game
+updateMouseMove position game =
     case game.state of
         Ready ->
-            game
+            -- start move if mouse down detail is present, a mouse up hasn't been received, and the pixel diff is greater than some threshold
+            case game.lastMouseDown of
+                Just mouseDownDetail ->
+                    let
+                        movement =
+                            Position.diff mouseDownDetail.position position
+                                |> Position.magnitude
+
+                        cardLoc =
+                            mouseDownDetail.locatedCard |> Tuple.first
+
+                        card =
+                            mouseDownDetail.locatedCard |> Tuple.second
+                    in
+                    if not mouseDownDetail.mouseUpReceived && movement > 2 then
+                        startMove ( cardLoc, card ) mouseDownDetail.position game
+
+                    else
+                        game
+
+                Nothing ->
+                    game
 
         PlayerMove lastMove ->
             { game | state = PlayerMove (Move.update position lastMove) }

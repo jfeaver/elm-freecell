@@ -57,7 +57,7 @@ pickUps =
                             |> Expect.equal 7
                     , \_ ->
                         -- The largest pile that is pickable should be 5
-                        Game.startMove cardLoc pickedCard ( 0, 0 ) game
+                        Game.startMove ( cardLoc, pickedCard ) ( 0, 0 ) game
                             |> .state
                             |> Expect.equal Ready
                     ]
@@ -94,7 +94,7 @@ putDowns =
                         TableCascade 0 0
 
                     move =
-                        PlayerMove (Move.new pickedFrom pickedCard pickedPile ( 0, 0 ))
+                        PlayerMove (Move.new ( pickedFrom, pickedCard ) pickedPile ( 0, 0 ))
 
                     newGame =
                         Game.new Deck.fullDeck

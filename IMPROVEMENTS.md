@@ -7,8 +7,7 @@
 - hitbox drop collisions (versus point collision right now)
 - ignore right click
 - highlight any possible card location other than free cells
-- pulse possible card locations twice and then stop
-- The card highlight feels like it sinks the card rather than drawing it forward
-- The card highlight is a suggestion so it shouldn't highlight a card directly above the focused card
+- pulse possible card locations twice and then stop (??)
 - Add focused pile indicator showing the maximum movable pile
 - When I'm tired, it's hard to see the transition point between a highlighted card and a pile indicator
+- Extract a Game.Msg from Msg (and move game updates to Game)

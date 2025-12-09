@@ -8,7 +8,7 @@ import Card.View
 import Cascade exposing (Column, Row)
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck exposing (Deck)
-import Game exposing (Game, State(..))
+import Game exposing (Game, MouseDownDetail, State(..))
 import Html.Events exposing (onMouseEnter, onMouseLeave)
 import Html.Events.Extra.Mouse exposing (Event, onDown, onMove, onUp)
 import Html.Styled as Html exposing (Html, button, div, text)
@@ -42,14 +42,13 @@ type Model
 type Msg
     = SetGame Deck
     | NewGame
-    | DoubleClick Position
     | MouseDown ( CardLoc, Card ) Event
     | FocusCard ( CardLoc, Card )
     | DefocusCard
     | MouseMove Event
     | MouseUp Event
     | EndMove (Result Browser.Dom.Error ( Element, Event ))
-    | DetectDoubleClick Position (Result Browser.Dom.Error ( Element, Time.Posix ))
+    | RecordMouseDownTAndP Position ( CardLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
 
 
 startGame : Cmd Msg
@@ -62,11 +61,12 @@ init =
     ( MainMenu, startGame )
 
 
-doubleClickUpdate : Game -> Position -> ( Model, Cmd Msg )
-doubleClickUpdate game position =
+doubleClickUpdate : Game -> MouseDownDetail -> Position -> ( Model, Cmd Msg )
+doubleClickUpdate game mouseDownDetail tablePosition =
     let
-        automoveGame =
+        autoMoveGame =
             game
+                |> Game.startMove mouseDownDetail.locatedCard mouseDownDetail.position
                 |> Game.autoMove
                 |> (\updatedGame -> { updatedGame | doubleClickLast = True })
 
@@ -74,29 +74,29 @@ doubleClickUpdate game position =
         -- check if that cascade location is the last cascade card
         -- focus on that card
         mNextCardLoc =
-            Table.View.locFor automoveGame.table position
+            Table.View.locFor autoMoveGame.table tablePosition
 
-        locatedTableCard tCardLoc =
-            automoveGame.table
+        mLocatedTableCard tCardLoc =
+            autoMoveGame.table
                 |> Table.getTableCard tCardLoc
                 |> Maybe.map (\card -> ( Table.tableCardLocToCardLoc tCardLoc, card ))
 
         mNextLocatedCard =
             mNextCardLoc
-                |> Maybe.andThen locatedTableCard
+                |> Maybe.andThen mLocatedTableCard
 
         refocusCard card =
-            update (FocusCard card) (InGame automoveGame)
+            update (FocusCard card) (InGame autoMoveGame)
 
-        defocus =
-            update DefocusCard (InGame automoveGame)
+        defocus _ =
+            update DefocusCard (InGame autoMoveGame)
     in
     case mNextLocatedCard of
         Just locatedCard ->
             refocusCard locatedCard
 
         Nothing ->
-            defocus
+            defocus ()
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -112,39 +112,27 @@ update msg model =
         NewGame ->
             ( model, startGame )
 
-        DoubleClick position ->
-            case model of
-                InGame game ->
-                    doubleClickUpdate game position
-
-                _ ->
-                    ( model, Cmd.none )
-
-        MouseDown ( cardLoc, card ) { clientPos, button } ->
+        MouseDown locatedCard { clientPos, button } ->
             -- Should do only these things:
             -- Record that a click happened and the position where it happened (maybe just a recycled DetectDoubleClick)
             --
             -- Elsewhere:
             -- If some threshold of pixels are moved (maybe 2?) and mouse up event is not received then we start a hand move in mouse move
-            -- If some threshold of time goes by (maybe 500 ms like double click threshold) and mouse up event is not received and hand move is not started then we start a hand move
             case model of
-                InGame game ->
-                    let
-                        updatedGame =
-                            case button of
-                                Html.Events.Extra.Mouse.MainButton ->
-                                    Game.startMove cardLoc card clientPos game
+                InGame _ ->
+                    case button of
+                        Html.Events.Extra.Mouse.MainButton ->
+                            let
+                                getTableElement =
+                                    Browser.Dom.getElement "table"
 
-                                _ ->
-                                    game
+                                task =
+                                    Task.map2 (\el time -> ( el, time )) getTableElement Time.now
+                            in
+                            ( model, Task.attempt (RecordMouseDownTAndP clientPos locatedCard) task )
 
-                        getTableElement =
-                            Browser.Dom.getElement "table"
-
-                        task =
-                            Task.map2 (\el time -> ( el, time )) getTableElement Time.now
-                    in
-                    ( InGame updatedGame, Task.attempt (DetectDoubleClick clientPos) task )
+                        _ ->
+                            ( model, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -178,7 +166,7 @@ update msg model =
                 InGame game ->
                     let
                         updatedGame =
-                            Game.updateMove clientPos game
+                            Game.updateMouseMove clientPos game
                     in
                     ( InGame updatedGame, Cmd.none )
 
@@ -192,8 +180,24 @@ update msg model =
 
                 elementWithEvent el =
                     ( el, event )
+
+                withMouseUp lastMouseDown =
+                    { lastMouseDown | mouseUpReceived = True }
+
+                updatedGame game =
+                    case game.lastMouseDown of
+                        Just mouseDownDetail ->
+                            { game | lastMouseDown = Just (withMouseUp mouseDownDetail) }
+
+                        Nothing ->
+                            game
             in
-            ( model, Task.attempt EndMove <| Task.map elementWithEvent getTableElement )
+            case model of
+                InGame game ->
+                    ( InGame (updatedGame game), Task.attempt EndMove <| Task.map elementWithEvent getTableElement )
+
+                _ ->
+                    ( model, Cmd.none )
 
         EndMove result ->
             case model of
@@ -213,7 +217,7 @@ update msg model =
                                 updatedGame =
                                     Game.endMove mLastCardLoc game
                             in
-                            ( InGame updatedGame, Cmd.none )
+                            update DefocusCard (InGame updatedGame)
 
                         Err _ ->
                             ( model, Cmd.none )
@@ -221,32 +225,46 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        DetectDoubleClick position (Ok ( tableEl, time )) ->
+        RecordMouseDownTAndP position locatedCard (Ok ( tableEl, time )) ->
+            -- NOTE: Only main button mouse downs
             case model of
                 InGame game ->
                     let
-                        mouseDownDiff =
-                            Time.posixToMillis time - Time.posixToMillis game.lastMouseDown
+                        mouseDownDiff lastMouseDownTime =
+                            Time.posixToMillis time - Time.posixToMillis lastMouseDownTime
 
-                        updatedGame =
-                            { game | lastMouseDown = time, doubleClickLast = False }
-
-                        tablePosition =
+                        tableElPosition =
                             ( tableEl.element.x, tableEl.element.y )
 
-                        clickTablePosition =
-                            Position.diff tablePosition position
-                    in
-                    if mouseDownDiff <= 500 && not game.doubleClickLast then
-                        update (DoubleClick clickTablePosition) (InGame updatedGame)
+                        tablePosition =
+                            Position.diff tableElPosition position
 
-                    else
-                        ( InGame updatedGame, Cmd.none )
+                        mouseDownDetail : MouseDownDetail
+                        mouseDownDetail =
+                            { time = time
+                            , position = position
+                            , locatedCard = locatedCard
+                            , mouseUpReceived = False
+                            }
+
+                        recordMouseDown =
+                            { game | lastMouseDown = Just mouseDownDetail, doubleClickLast = False }
+                    in
+                    case game.lastMouseDown of
+                        Just lastMouseDown ->
+                            if mouseDownDiff lastMouseDown.time <= 500 && not game.doubleClickLast then
+                                doubleClickUpdate recordMouseDown mouseDownDetail tablePosition
+
+                            else
+                                ( InGame recordMouseDown, Cmd.none )
+
+                        Nothing ->
+                            ( InGame recordMouseDown, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
-        DetectDoubleClick _ _ ->
+        RecordMouseDownTAndP _ _ _ ->
             -- If error finding table element... do nothing.
             ( model, Cmd.none )
 

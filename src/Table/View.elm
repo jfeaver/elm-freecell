@@ -259,9 +259,9 @@ foundationLocFor ( left, top ) =
 
 
 locFor : Table -> Position -> Maybe TableLoc
-locFor table position =
-    Maybe.Extra.or (cascadesLocFor table position) (cellsLocFor table position)
-        |> Maybe.Extra.or (foundationLocFor position)
+locFor table tablePosition =
+    Maybe.Extra.or (cascadesLocFor table tablePosition) (cellsLocFor table tablePosition)
+        |> Maybe.Extra.or (foundationLocFor tablePosition)
 
 
 recursiveDeal : Table -> Row -> Column -> Array (List Card) -> Deck -> Array (List Card)

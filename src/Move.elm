@@ -39,8 +39,8 @@ type Move
         }
 
 
-new : CardLoc -> Card -> Pile -> Position -> Move
-new cardLoc topCard pile position =
+new : ( CardLoc, Card ) -> Pile -> Position -> Move
+new ( cardLoc, topCard ) pile position =
     let
         zIndexInHand depth card =
             { card | zIndex = Table.View.zIndexFor (Hand depth) }
