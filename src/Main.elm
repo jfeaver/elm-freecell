@@ -22,6 +22,7 @@ import Table exposing (CardLoc(..), Cell, Table)
 import Table.View
 import Task
 import Time
+import UI
 
 
 main : Program () Model Msg
@@ -93,6 +94,7 @@ doubleClickUpdate game mouseDownDetail tablePosition =
     in
     case mNextLocatedCard of
         Just locatedCard ->
+            -- FIXME: This is broken now?
             refocusCard locatedCard
 
         Nothing ->
@@ -150,6 +152,7 @@ update msg model =
                     ( model, Cmd.none )
 
         DefocusCard ->
+            -- FIXME: Cards are defocused after a single click
             case model of
                 InGame game ->
                     let
@@ -174,6 +177,7 @@ update msg model =
                     ( model, Cmd.none )
 
         MouseUp event ->
+            -- FIXME: moving a card by drag and drop out of a foundation doesn't work
             let
                 getTableElement =
                     Browser.Dom.getElement "table"
@@ -385,63 +389,103 @@ foundations game =
         ]
 
 
-
-{-
-   TODO - On hover-movable pile:
-   {
-       box-shadow: 0px 0px 4px 3px greenyellow;
-       border-radius: 5px;
-       top: __
-       z-index: __
-   }
--}
+type alias PileIndicatorDetails =
+    { pile : Pile
+    , rowStart : Row
+    , pileDepth : Int
+    , indicatorTop : Float
+    , cascadeOffset : Float
+    , focused : Bool
+    }
 
 
-unfocusedPileIndicator : ( Row, Pile ) -> Float -> Html Msg
-unfocusedPileIndicator ( rowStart, pile ) cascadeOffset =
+pileIndicator : PileIndicatorDetails -> Maybe Int -> List (Html Msg)
+pileIndicator details mPickablePileDepth =
     let
-        pileDepth =
-            List.length pile
+        mSplitPileIndicator pickablePileDepth =
+            if pickablePileDepth < details.pileDepth then
+                Just (splitPileIndicator pickablePileDepth details)
 
-        pileHeight =
+            else
+                Nothing
+    in
+    mPickablePileDepth
+        |> Maybe.andThen mSplitPileIndicator
+        |> Maybe.withDefault (unifiedPileIndicator details Nothing)
+
+
+unifiedPileIndicator : PileIndicatorDetails -> Maybe Css.Color -> List (Html Msg)
+unifiedPileIndicator { pileDepth, indicatorTop, cascadeOffset, rowStart, focused } mColor =
+    let
+        height =
             (pileDepth - 1 |> toFloat) * Table.View.stackSpacing + Card.View.height
 
-        indicatorTop =
-            rowStart
-                |> toFloat
-                |> (*) Table.View.stackSpacing
-                |> (+) Table.View.cascadesTop
+        defaultColor =
+            if focused then
+                UI.pickablePileIndicatorColor
+
+            else
+                UI.pileIndicatorColor
+
+        color =
+            mColor
+                |> Maybe.withDefault defaultColor
     in
-    div
+    [ div
         [ css
             [ position absolute
             , top (px indicatorTop)
             , left (px cascadeOffset)
-            , Css.height (px pileHeight)
+            , Css.height (px height)
             , Css.width (px Card.View.width)
-
-            -- TODO: Use UI for sizes here
-            , Css.boxShadow5 (px -4) (px 0) (px 0) (px -1) (Css.rgb 95 199 199)
-            , Css.borderRadius (px 5)
+            , Css.boxShadow5 (px -UI.indicatorWidth) (px 0) (px 0) (px -1) color
+            , Css.borderRadius (px UI.indicatorRadius)
             , zIndex (int rowStart)
             ]
         ]
         []
+    ]
 
 
-focusedPileIndicator : ( Row, Pile ) -> ( CardLoc, Card ) -> List (Html Msg)
-focusedPileIndicator ( row, pile ) ( cardLoc, card ) =
-    []
+splitPileIndicator : Int -> PileIndicatorDetails -> List (Html Msg)
+splitPileIndicator pickablePileDepth details =
+    let
+        activeColor =
+            UI.pickablePileIndicatorColor
+
+        inactiveColor =
+            UI.unpickablePileIndicatorColor
+
+        splitDepth =
+            details.pileDepth - pickablePileDepth
+
+        activePileDetails =
+            { details
+                | pileDepth = pickablePileDepth
+                , rowStart = details.rowStart + splitDepth
+                , indicatorTop = details.indicatorTop + (toFloat splitDepth * Table.View.stackSpacing)
+            }
+    in
+    List.append (unifiedPileIndicator details (Just inactiveColor)) (unifiedPileIndicator activePileDetails (Just activeColor))
 
 
 cascade : Game -> Float -> ( Column, List Card ) -> Html Msg
 cascade game cascadesOffset ( column, cards ) =
     let
-        pile =
+        ( rowStart, pile ) =
             Pile.fromCascade cards
+
+        pileDepth =
+            List.length pile
 
         cascadeOffset =
             cascadesOffset + toFloat column * (Card.View.width + Table.View.padding)
+
+        pileIndicatorTop =
+            rowStart
+                |> toFloat
+                |> (*) Table.View.stackSpacing
+                |> (+) Table.View.cascadesTop
 
         cardMark =
             div
@@ -454,14 +498,35 @@ cascade game cascadesOffset ( column, cards ) =
                 ]
                 []
 
-        focusedPileIndicator_ =
-            game.focusedCard
-                |> Maybe.map (focusedPileIndicator pile)
-                |> Maybe.withDefault []
+        mFocusedColumn =
+            Game.focusedColumn game
+
+        focused =
+            -- FIXME: a focused column doesn't mean the player is focusing on the pile
+            mFocusedColumn
+                |> Maybe.map ((==) column)
+                |> Maybe.withDefault False
+
+        pileIndicatorDetails : PileIndicatorDetails
+        pileIndicatorDetails =
+            { pile = pile
+            , pileDepth = List.length pile
+            , rowStart = rowStart
+            , indicatorTop = pileIndicatorTop
+            , cascadeOffset = cascadeOffset
+            , focused = focused
+            }
+
+        mPickablePileDepth =
+            if focused then
+                Just (Game.maxPileDepth (List.length cards - List.length pile) game.table)
+
+            else
+                Nothing
 
         mPileIndicator =
-            if List.length (pile |> Tuple.second) > 1 then
-                Just (unfocusedPileIndicator pile cascadeOffset)
+            if pileDepth > 1 then
+                Just (pileIndicator pileIndicatorDetails mPickablePileDepth)
 
             else
                 Nothing
@@ -471,13 +536,12 @@ cascade game cascadesOffset ( column, cards ) =
 
         indicators =
             mPileIndicator
-                |> Maybe.map (\indicator -> [ indicator ])
                 |> Maybe.withDefault []
                 |> List.append basicIndicators
     in
     div [] <|
         List.concat
-            [ List.append indicators focusedPileIndicator_
+            [ indicators
             , List.indexedMap (cascadeCardView game (List.length cards) column) cards
             ]
 
@@ -585,8 +649,8 @@ cardView game cardLoc card =
                 , sizing (cardHighlightInset * 2)
                 , css
                     [ margin (px cardHighlightInset)
-                    , Css.borderRadius (px (5 - cardHighlightInset))
-                    , Css.boxShadow5 (px 0) (px 0) (px 3) (px 4) (Css.rgb 156 201 227)
+                    , Css.borderRadius (px (UI.indicatorRadius - cardHighlightInset))
+                    , Css.boxShadow5 (px 0) (px 0) (px (UI.indicatorWidth - 1)) (px UI.indicatorWidth) UI.cardHighlightColor
                     ]
                 ]
                 []

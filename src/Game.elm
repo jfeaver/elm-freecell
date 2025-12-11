@@ -4,6 +4,7 @@ module Game exposing
     , State(..)
     , autoMove
     , endMove
+    , focusedColumn
     , maxPileDepth
     , new
     , startMove
@@ -393,3 +394,18 @@ endMove mTableLoc game =
                             move
             in
             { game | table = Move.finalize game.table theMove, state = Ready }
+
+
+focusedColumn : Game -> Maybe Column
+focusedColumn game =
+    let
+        cardLocToColumn cardLoc =
+            case cardLoc of
+                CascadeLoc column _ ->
+                    Just column
+
+                _ ->
+                    Nothing
+    in
+    game.focusedCard
+        |> Maybe.andThen (\( cardLoc, _ ) -> cardLocToColumn cardLoc)

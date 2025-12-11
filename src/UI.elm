@@ -1,5 +1,7 @@
 module UI exposing (..)
 
+import Css
+
 
 zoom : Float
 zoom =
@@ -9,6 +11,16 @@ zoom =
 zoomed : Float -> Float
 zoomed n =
     n * zoom
+
+
+indicatorWidth : Float
+indicatorWidth =
+    3.0 |> zoomedR
+
+
+indicatorRadius : Float
+indicatorRadius =
+    3.8 |> zoomedR
 
 
 zoomedR : Float -> Float
@@ -29,3 +41,22 @@ roundToHalf n =
 roundToWhole : Float -> Float
 roundToWhole =
     round >> toFloat
+
+
+pileIndicatorColor : Css.Color
+pileIndicatorColor =
+    Css.rgb 95 199 199
+
+
+pickablePileIndicatorColor : Css.Color
+pickablePileIndicatorColor =
+    Css.rgb 184 255 51
+
+
+unpickablePileIndicatorColor : Css.Color
+unpickablePileIndicatorColor =
+    Css.rgb 255 155 44
+
+cardHighlightColor : Css.Color
+cardHighlightColor =
+    Css.rgb 156 201 227

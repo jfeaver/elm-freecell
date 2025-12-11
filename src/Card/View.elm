@@ -89,3 +89,12 @@ height =
 suitIconSrc : Suit -> String
 suitIconSrc suit =
     "assets/" ++ suitName suit ++ ".svg"
+
+
+{-| The svg rendered card doesn't quite go to the bottom of its requested area.
+When the image is rendered with a height of 75 pixels then the render falls
+short of that height by about 0.3 pixels
+-}
+shortBy : Float
+shortBy =
+    0.3 |> UI.zoomed
