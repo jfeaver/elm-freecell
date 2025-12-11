@@ -1,6 +1,7 @@
 module Game exposing
     ( Game
     , MouseDownDetail
+    , Msg(..)
     , State(..)
     , autoMove
     , endMove
@@ -8,21 +9,25 @@ module Game exposing
     , maxPileDepth
     , new
     , startMove
+    , update
     , updateMouseMove
     )
 
 import Array
+import Browser.Dom exposing (Element)
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color
 import Card.Rank
 import Cascade exposing (Column, Row)
 import Deck exposing (Deck)
+import Html.Events.Extra.Mouse exposing (Event)
 import List.Extra
 import Maybe.Extra
 import Move exposing (Move)
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Cell, Table, TableLoc(..))
 import Table.View
+import Task
 import Time
 
 
@@ -50,6 +55,16 @@ type State
     | PlayerMove Move
 
 
+type Msg
+    = MouseDown ( CardLoc, Card ) Event
+    | MouseMove Event
+    | MouseUp Event
+    | FocusCard ( CardLoc, Card )
+    | DefocusCard
+    | EndMove (Result Browser.Dom.Error ( Element, Event ))
+    | RecordMouseDownTAndP Position ( CardLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
+
+
 new : Deck -> Game
 new deck =
     let
@@ -62,6 +77,159 @@ new deck =
     , doubleClickLast = False
     , focusedCard = Nothing
     }
+
+
+doubleClickUpdate : Game -> MouseDownDetail -> Position -> ( Game, Cmd Msg )
+doubleClickUpdate game mouseDownDetail tablePosition =
+    let
+        autoMoveGame =
+            game
+                |> startMove mouseDownDetail.locatedCard mouseDownDetail.position
+                |> autoMove
+                |> (\updatedGame -> { updatedGame | doubleClickLast = True })
+
+        -- see if click is a cascade location
+        -- check if that cascade location is the last cascade card
+        -- focus on that card
+        mNextCardLoc =
+            Table.View.locFor autoMoveGame.table tablePosition
+
+        mLocatedTableCard tCardLoc =
+            autoMoveGame.table
+                |> Table.getTableCard tCardLoc
+                |> Maybe.map (\card -> ( Table.tableCardLocToCardLoc tCardLoc, card ))
+
+        mNextLocatedCard =
+            mNextCardLoc
+                |> Maybe.andThen mLocatedTableCard
+
+        refocusCard card =
+            update (FocusCard card) autoMoveGame
+
+        defocus _ =
+            update DefocusCard autoMoveGame
+    in
+    case mNextLocatedCard of
+        Just locatedCard ->
+            -- FIXME: This is broken now?
+            refocusCard locatedCard
+
+        Nothing ->
+            defocus ()
+
+
+update : Msg -> Game -> ( Game, Cmd Msg )
+update msg game =
+    case msg of
+        MouseDown locatedCard { clientPos, button } ->
+            -- Should do only these things:
+            -- Record that a click happened and the position where it happened (maybe just a recycled DetectDoubleClick)
+            --
+            -- Elsewhere:
+            -- If some threshold of pixels are moved (maybe 2?) and mouse up event is not received then we start a hand move in mouse move
+            case button of
+                Html.Events.Extra.Mouse.MainButton ->
+                    let
+                        getTableElement =
+                            Browser.Dom.getElement "table"
+
+                        task =
+                            Task.map2 (\el time -> ( el, time )) getTableElement Time.now
+                    in
+                    ( game, Task.attempt (RecordMouseDownTAndP clientPos locatedCard) task )
+
+                _ ->
+                    ( game, Cmd.none )
+
+        MouseMove { clientPos } ->
+            ( updateMouseMove clientPos game, Cmd.none )
+
+        MouseUp event ->
+            -- FIXME: moving a card by drag and drop out of a foundation doesn't work
+            let
+                getTableElement =
+                    Browser.Dom.getElement "table"
+
+                elementWithEvent el =
+                    ( el, event )
+
+                withMouseUp lastMouseDown =
+                    { lastMouseDown | mouseUpReceived = True }
+
+                updatedGame =
+                    case game.lastMouseDown of
+                        Just mouseDownDetail ->
+                            { game | lastMouseDown = Just (withMouseUp mouseDownDetail) }
+
+                        Nothing ->
+                            game
+            in
+            ( updatedGame, Task.attempt EndMove <| Task.map elementWithEvent getTableElement )
+
+        FocusCard focusedCard ->
+            ( { game | focusedCard = Just focusedCard }, Cmd.none )
+
+        DefocusCard ->
+            -- FIXME: Cards are defocused after a single click
+            ( { game | focusedCard = Nothing }, Cmd.none )
+
+        EndMove result ->
+            case result of
+                Ok ( tableEl, event ) ->
+                    let
+                        tablePosition =
+                            ( tableEl.element.x, tableEl.element.y )
+
+                        mouseUpTablePosition =
+                            Position.diff tablePosition event.clientPos
+
+                        mLastCardLoc =
+                            Table.View.locFor game.table mouseUpTablePosition
+
+                        updatedGame =
+                            endMove mLastCardLoc game
+                    in
+                    update DefocusCard updatedGame
+
+                Err _ ->
+                    ( game, Cmd.none )
+
+        RecordMouseDownTAndP position locatedCard (Ok ( tableEl, time )) ->
+            let
+                mouseDownDiff lastMouseDownTime =
+                    Time.posixToMillis time - Time.posixToMillis lastMouseDownTime
+
+                tableElPosition =
+                    ( tableEl.element.x, tableEl.element.y )
+
+                tablePosition =
+                    Position.diff tableElPosition position
+
+                mouseDownDetail : MouseDownDetail
+                mouseDownDetail =
+                    { time = time
+                    , position = position
+                    , locatedCard = locatedCard
+                    , mouseUpReceived = False
+                    }
+
+                recordMouseDown =
+                    { game | lastMouseDown = Just mouseDownDetail, doubleClickLast = False }
+            in
+            case game.lastMouseDown of
+                Just lastMouseDown ->
+                    if mouseDownDiff lastMouseDown.time <= 500 && not game.doubleClickLast then
+                        doubleClickUpdate recordMouseDown mouseDownDetail tablePosition
+
+                    else
+                        ( recordMouseDown, Cmd.none )
+
+                Nothing ->
+                    ( recordMouseDown, Cmd.none )
+
+        RecordMouseDownTAndP _ _ _ ->
+            -- If error finding table element... do nothing.
+            ( game, Cmd.none )
 
 
 startMove : ( CardLoc, Card ) -> Position -> Game -> Game

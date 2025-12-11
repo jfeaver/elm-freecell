@@ -2,26 +2,22 @@ module Main exposing (..)
 
 import Array
 import Browser exposing (Document)
-import Browser.Dom exposing (Element)
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.View
 import Cascade exposing (Column, Row)
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck exposing (Deck)
-import Game exposing (Game, MouseDownDetail, State(..))
+import Game exposing (Game, Msg(..), State(..))
 import Html.Events exposing (onMouseEnter, onMouseLeave)
-import Html.Events.Extra.Mouse exposing (Event, onDown, onMove, onUp)
+import Html.Events.Extra.Mouse exposing (onDown, onMove, onUp)
 import Html.Styled as Html exposing (Html, button, div, text)
 import Html.Styled.Attributes exposing (css, fromUnstyled, id)
 import Html.Styled.Events exposing (onClick)
 import Move
 import Pile exposing (Pile)
-import Position exposing (Position)
 import Random
 import Table exposing (CardLoc(..), Cell, Table)
 import Table.View
-import Task
-import Time
 import UI
 
 
@@ -43,13 +39,7 @@ type Model
 type Msg
     = SetGame Deck
     | NewGame
-    | MouseDown ( CardLoc, Card ) Event
-    | FocusCard ( CardLoc, Card )
-    | DefocusCard
-    | MouseMove Event
-    | MouseUp Event
-    | EndMove (Result Browser.Dom.Error ( Element, Event ))
-    | RecordMouseDownTAndP Position ( CardLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
+    | GameMsg Game.Msg
 
 
 startGame : Cmd Msg
@@ -60,45 +50,6 @@ startGame =
 init : ( Model, Cmd Msg )
 init =
     ( MainMenu, startGame )
-
-
-doubleClickUpdate : Game -> MouseDownDetail -> Position -> ( Model, Cmd Msg )
-doubleClickUpdate game mouseDownDetail tablePosition =
-    let
-        autoMoveGame =
-            game
-                |> Game.startMove mouseDownDetail.locatedCard mouseDownDetail.position
-                |> Game.autoMove
-                |> (\updatedGame -> { updatedGame | doubleClickLast = True })
-
-        -- see if click is a cascade location
-        -- check if that cascade location is the last cascade card
-        -- focus on that card
-        mNextCardLoc =
-            Table.View.locFor autoMoveGame.table tablePosition
-
-        mLocatedTableCard tCardLoc =
-            autoMoveGame.table
-                |> Table.getTableCard tCardLoc
-                |> Maybe.map (\card -> ( Table.tableCardLocToCardLoc tCardLoc, card ))
-
-        mNextLocatedCard =
-            mNextCardLoc
-                |> Maybe.andThen mLocatedTableCard
-
-        refocusCard card =
-            update (FocusCard card) (InGame autoMoveGame)
-
-        defocus _ =
-            update DefocusCard (InGame autoMoveGame)
-    in
-    case mNextLocatedCard of
-        Just locatedCard ->
-            -- FIXME: This is broken now?
-            refocusCard locatedCard
-
-        Nothing ->
-            defocus ()
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -114,163 +65,14 @@ update msg model =
         NewGame ->
             ( model, startGame )
 
-        MouseDown locatedCard { clientPos, button } ->
-            -- Should do only these things:
-            -- Record that a click happened and the position where it happened (maybe just a recycled DetectDoubleClick)
-            --
-            -- Elsewhere:
-            -- If some threshold of pixels are moved (maybe 2?) and mouse up event is not received then we start a hand move in mouse move
-            case model of
-                InGame _ ->
-                    case button of
-                        Html.Events.Extra.Mouse.MainButton ->
-                            let
-                                getTableElement =
-                                    Browser.Dom.getElement "table"
-
-                                task =
-                                    Task.map2 (\el time -> ( el, time )) getTableElement Time.now
-                            in
-                            ( model, Task.attempt (RecordMouseDownTAndP clientPos locatedCard) task )
-
-                        _ ->
-                            ( model, Cmd.none )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        FocusCard focusedCard ->
+        GameMsg gameMsg ->
             case model of
                 InGame game ->
-                    let
-                        updatedGame =
-                            { game | focusedCard = Just focusedCard }
-                    in
-                    ( InGame updatedGame, Cmd.none )
+                    Game.update gameMsg game
+                        |> Tuple.mapBoth (\updatedGame -> InGame updatedGame) (Cmd.map GameMsg)
 
                 _ ->
                     ( model, Cmd.none )
-
-        DefocusCard ->
-            -- FIXME: Cards are defocused after a single click
-            case model of
-                InGame game ->
-                    let
-                        updatedGame =
-                            { game | focusedCard = Nothing }
-                    in
-                    ( InGame updatedGame, Cmd.none )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        MouseMove { clientPos } ->
-            case model of
-                InGame game ->
-                    let
-                        updatedGame =
-                            Game.updateMouseMove clientPos game
-                    in
-                    ( InGame updatedGame, Cmd.none )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        MouseUp event ->
-            -- FIXME: moving a card by drag and drop out of a foundation doesn't work
-            let
-                getTableElement =
-                    Browser.Dom.getElement "table"
-
-                elementWithEvent el =
-                    ( el, event )
-
-                withMouseUp lastMouseDown =
-                    { lastMouseDown | mouseUpReceived = True }
-
-                updatedGame game =
-                    case game.lastMouseDown of
-                        Just mouseDownDetail ->
-                            { game | lastMouseDown = Just (withMouseUp mouseDownDetail) }
-
-                        Nothing ->
-                            game
-            in
-            case model of
-                InGame game ->
-                    ( InGame (updatedGame game), Task.attempt EndMove <| Task.map elementWithEvent getTableElement )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        EndMove result ->
-            case model of
-                InGame game ->
-                    case result of
-                        Ok ( tableEl, event ) ->
-                            let
-                                tablePosition =
-                                    ( tableEl.element.x, tableEl.element.y )
-
-                                mouseUpTablePosition =
-                                    Position.diff tablePosition event.clientPos
-
-                                mLastCardLoc =
-                                    Table.View.locFor game.table mouseUpTablePosition
-
-                                updatedGame =
-                                    Game.endMove mLastCardLoc game
-                            in
-                            update DefocusCard (InGame updatedGame)
-
-                        Err _ ->
-                            ( model, Cmd.none )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        RecordMouseDownTAndP position locatedCard (Ok ( tableEl, time )) ->
-            -- NOTE: Only main button mouse downs
-            case model of
-                InGame game ->
-                    let
-                        mouseDownDiff lastMouseDownTime =
-                            Time.posixToMillis time - Time.posixToMillis lastMouseDownTime
-
-                        tableElPosition =
-                            ( tableEl.element.x, tableEl.element.y )
-
-                        tablePosition =
-                            Position.diff tableElPosition position
-
-                        mouseDownDetail : MouseDownDetail
-                        mouseDownDetail =
-                            { time = time
-                            , position = position
-                            , locatedCard = locatedCard
-                            , mouseUpReceived = False
-                            }
-
-                        recordMouseDown =
-                            { game | lastMouseDown = Just mouseDownDetail, doubleClickLast = False }
-                    in
-                    case game.lastMouseDown of
-                        Just lastMouseDown ->
-                            if mouseDownDiff lastMouseDown.time <= 500 && not game.doubleClickLast then
-                                doubleClickUpdate recordMouseDown mouseDownDetail tablePosition
-
-                            else
-                                ( InGame recordMouseDown, Cmd.none )
-
-                        Nothing ->
-                            ( InGame recordMouseDown, Cmd.none )
-
-                _ ->
-                    ( model, Cmd.none )
-
-        RecordMouseDownTAndP _ _ _ ->
-            -- If error finding table element... do nothing.
-            ( model, Cmd.none )
 
 
 view : Model -> Document Msg
@@ -297,8 +99,8 @@ body model =
                     , width (px Table.View.width)
                     , height (px <| Table.View.height + Table.View.expandedPlayHeight game.table)
                     ]
-                , onMove MouseMove |> fromUnstyled
-                , onUp MouseUp |> fromUnstyled
+                , onMove (MouseMove >> GameMsg) |> fromUnstyled
+                , onUp (MouseUp >> GameMsg) |> fromUnstyled
                 , id "table"
                 ]
                 [ cells game
@@ -630,9 +432,9 @@ cardView game cardLoc card =
                     css []
 
         interaction =
-            [ onDown (MouseDown ( cardLoc, card ))
-            , onMouseEnter (FocusCard ( cardLoc, card ))
-            , onMouseLeave DefocusCard
+            [ onDown (MouseDown ( cardLoc, card ) >> GameMsg)
+            , onMouseEnter (FocusCard ( cardLoc, card ) |> GameMsg)
+            , onMouseLeave (DefocusCard |> GameMsg)
             ]
                 |> List.map fromUnstyled
 
