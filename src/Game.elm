@@ -3,14 +3,12 @@ module Game exposing
     , MouseDownDetail
     , Msg(..)
     , State(..)
-    , autoMove
     , endMove
     , focusedColumn
     , maxPileDepth
     , new
     , startMove
     , update
-    , updateMouseMove
     )
 
 import Array
@@ -111,7 +109,6 @@ doubleClickUpdate game mouseDownDetail tablePosition =
     in
     case mNextLocatedCard of
         Just locatedCard ->
-            -- FIXME: This is broken now?
             refocusCard locatedCard
 
         Nothing ->
@@ -145,7 +142,6 @@ update msg game =
             ( updateMouseMove clientPos game, Cmd.none )
 
         MouseUp event ->
-            -- FIXME: moving a card by drag and drop out of a foundation doesn't work
             let
                 getTableElement =
                     Browser.Dom.getElement "table"
@@ -170,26 +166,27 @@ update msg game =
             ( { game | focusedCard = Just focusedCard }, Cmd.none )
 
         DefocusCard ->
-            -- FIXME: Cards are defocused after a single click
             ( { game | focusedCard = Nothing }, Cmd.none )
 
         EndMove result ->
             case result of
                 Ok ( tableEl, event ) ->
-                    let
-                        tablePosition =
-                            ( tableEl.element.x, tableEl.element.y )
+                    case game.state of
+                        Ready ->
+                            ( game, Cmd.none )
 
-                        mouseUpTablePosition =
-                            Position.diff tablePosition event.clientPos
+                        PlayerMove move ->
+                            let
+                                tablePosition =
+                                    ( tableEl.element.x, tableEl.element.y )
 
-                        mLastCardLoc =
-                            Table.View.locFor game.table mouseUpTablePosition
+                                mouseUpTablePosition =
+                                    Position.diff tablePosition event.clientPos
 
-                        updatedGame =
-                            endMove mLastCardLoc game
-                    in
-                    update DefocusCard updatedGame
+                                mLastCardLoc =
+                                    Table.View.locFor game.table mouseUpTablePosition
+                            in
+                            ( endMove mLastCardLoc move game, Cmd.none )
 
                 Err _ ->
                     ( game, Cmd.none )
@@ -393,12 +390,7 @@ maxPileDepthAlgorithm maxFn table =
 -}
 maxCascadesPileDepth : Row -> Int -> Int -> Int
 maxCascadesPileDepth row emptyCascades emptyCells =
-    if row == 0 then
-        -- Picking up a full cascade shouldn't count the active cascade as an empty one
-        2 ^ (emptyCascades - 1) * (emptyCells + 1)
-
-    else
-        2 ^ emptyCascades * (emptyCells + 1)
+    2 ^ emptyCascades * (emptyCells + 1)
 
 
 {-| Given the row that you're picking up from (since picking from row 0 creates an empty
@@ -412,12 +404,20 @@ maxPileDepth row table =
 
 pickMovablePile : CardLoc -> Game -> Maybe ( List Card, Table )
 pickMovablePile cardLoc game =
-    Table.pickPile cardLoc game.table
-        |> Maybe.andThen (maybePileMove cardLoc)
+    let
+        mPileMove ( pile, table ) =
+            maybePileMove cardLoc pile game.table
+
+        withUpdatedTable table pile =
+            ( pile, table )
+    in
+    game.table
+        |> Table.pickPile cardLoc
+        |> Maybe.andThen (\( pile, table ) -> mPileMove ( pile, table ) |> Maybe.map (withUpdatedTable table))
 
 
-maybePileMove : CardLoc -> ( List Card, Table ) -> Maybe ( List Card, Table )
-maybePileMove cardLoc ( pile, table ) =
+maybePileMove : CardLoc -> List Card -> Table -> Maybe (List Card)
+maybePileMove cardLoc pile table =
     let
         moveMax =
             case cardLoc of
@@ -428,7 +428,7 @@ maybePileMove cardLoc ( pile, table ) =
                     1
     in
     if List.length pile <= moveMax then
-        Just ( pile, table )
+        Just pile
 
     else
         Nothing
@@ -527,41 +527,36 @@ validToFoundation table move suit =
     Move.pileDepth move == 1 && Move.showingSuit move == suit && isIncrement
 
 
-endMove : Maybe TableLoc -> Game -> Game
-endMove mTableLoc game =
-    case game.state of
-        Ready ->
-            game
+endMove : Maybe TableLoc -> Move -> Game -> Game
+endMove mTableLoc move game =
+    let
+        theMove =
+            case mTableLoc of
+                Just (TableCascade column _) ->
+                    if validToCascade game.table move column then
+                        Move.toCascade column game.table move
 
-        PlayerMove move ->
-            let
-                theMove =
-                    case mTableLoc of
-                        Just (TableCascade column _) ->
-                            if validToCascade game.table move column then
-                                Move.toCascade column game.table move
+                    else
+                        move
 
-                            else
-                                move
+                Just (TableCell cell) ->
+                    if validToCell game.table move cell then
+                        Move.toCell cell move
 
-                        Just (TableCell cell) ->
-                            if validToCell game.table move cell then
-                                Move.toCell cell move
+                    else
+                        move
 
-                            else
-                                move
+                Just (TableFoundation suit) ->
+                    if validToFoundation game.table move suit then
+                        Move.toFoundation suit move
 
-                        Just (TableFoundation suit) ->
-                            if validToFoundation game.table move suit then
-                                Move.toFoundation suit move
+                    else
+                        move
 
-                            else
-                                move
-
-                        Nothing ->
-                            move
-            in
-            { game | table = Move.finalize game.table theMove, state = Ready }
+                Nothing ->
+                    move
+    in
+    { game | table = Move.finalize game.table theMove, state = Ready }
 
 
 focusedColumn : Game -> Maybe Column

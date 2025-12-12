@@ -192,8 +192,7 @@ foundations game =
 
 
 type alias PileIndicatorDetails =
-    { pile : Pile
-    , rowStart : Row
+    { rowStart : Row
     , pileDepth : Int
     , indicatorTop : Float
     , cascadeOffset : Float
@@ -311,8 +310,7 @@ cascade game cascadesOffset ( column, cards ) =
 
         pileIndicatorDetails : PileIndicatorDetails
         pileIndicatorDetails =
-            { pile = pile
-            , pileDepth = List.length pile
+            { pileDepth = List.length pile
             , rowStart = rowStart
             , indicatorTop = pileIndicatorTop
             , cascadeOffset = cascadeOffset

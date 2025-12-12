@@ -1,7 +1,4 @@
-module Rules exposing
-    ( pickUps
-    , putDowns
-    )
+module Rules exposing (pickUps, putDowns)
 
 import Array
 import Card exposing (Card, Rank(..), Suit(..))
@@ -62,6 +59,28 @@ pickUps =
                             |> Expect.equal Ready
                     ]
                     table
+        , test "the maximum pile depth when considering a cascade that is entirely made up of a pile is correct" <|
+            \_ ->
+                let
+                    newTable =
+                        Table.new 2 1
+
+                    c rank suit =
+                        Card ( 0, 0 ) 0 suit rank
+
+                    cascade =
+                        [ c King Spades, c Queen Hearts, c Jack Spades ]
+
+                    cascades =
+                        Array.initialize 1 (always cascade)
+
+                    table =
+                        { newTable | cascades = cascades }
+
+                    maxPileDepth =
+                        Game.maxPileDepth 0 table
+                in
+                Expect.equal maxPileDepth 3
         ]
 
 
@@ -94,7 +113,10 @@ putDowns =
                         TableCascade 0 0
 
                     move =
-                        PlayerMove (Move.new ( pickedFrom, pickedCard ) pickedPile ( 0, 0 ))
+                        Move.new ( pickedFrom, pickedCard ) pickedPile ( 0, 0 )
+
+                    gameState =
+                        PlayerMove move
 
                     newGame =
                         Game.new Deck.fullDeck
@@ -104,8 +126,8 @@ putDowns =
                             |> dealAnEmpty
 
                     game =
-                        { newGame | state = move, table = table }
-                            |> Game.endMove (Just tableLoc)
+                        { newGame | state = gameState, table = table }
+                            |> Game.endMove (Just tableLoc) move
 
                     finalTable =
                         case game.state of
