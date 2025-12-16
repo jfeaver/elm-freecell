@@ -37,14 +37,14 @@ type Model
 
 
 type Msg
-    = SetGame Deck
+    = SetGame Deck.Seed
     | NewGame
     | GameMsg Game.Msg
 
 
 startGame : Cmd Msg
 startGame =
-    Random.generate SetGame Deck.randomDeck
+    Random.generate SetGame Deck.initialSeed
 
 
 init : ( Model, Cmd Msg )
@@ -55,10 +55,10 @@ init =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SetGame deck ->
+        SetGame deckSeed ->
             let
                 game =
-                    Game.new deck
+                    Game.new deckSeed
             in
             ( InGame game, Cmd.none )
 

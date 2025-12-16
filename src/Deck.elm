@@ -48,17 +48,6 @@ fullDeck =
         |> merge
 
 
-{-| A 52-card deck in randomly shuffled order.
-type Msg = ShuffleDeck Deck
-Random.generate ShuffleDeck randomDeck
--}
-randomDeck : Random.Generator Deck
-randomDeck =
-    case fullDeck of
-        Deck deck ->
-            Random.map Deck <| shuffle deck
-
-
 draw : Deck -> ( Maybe Card, Deck )
 draw (Deck deck) =
     case deck of
@@ -67,3 +56,23 @@ draw (Deck deck) =
 
         card :: rest ->
             ( Just card, Deck rest )
+
+
+type alias Seed =
+    Int
+
+
+initialSeed : Random.Generator Seed
+initialSeed =
+    Random.int 0 1000000
+
+
+fromSeed : Seed -> Deck
+fromSeed seed =
+    case fullDeck of
+        Deck deck ->
+            seed
+                |> Random.initialSeed
+                |> Random.step (shuffle deck)
+                |> Tuple.first
+                |> Deck

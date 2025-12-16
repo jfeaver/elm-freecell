@@ -17,7 +17,7 @@ import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color
 import Card.Rank
 import Cascade exposing (Column, Row)
-import Deck exposing (Deck)
+import Deck
 import Html.Events.Extra.Mouse exposing (Event)
 import List.Extra
 import Maybe.Extra
@@ -65,11 +65,14 @@ type Msg
     | Undo
 
 
-new : Deck -> Game
-new deck =
+new : Deck.Seed -> Game
+new deckSeed =
     let
         table =
             Table.new 4 8
+
+        deck =
+            Deck.fromSeed deckSeed
     in
     { table = Table.View.deal table deck
     , state = Ready
