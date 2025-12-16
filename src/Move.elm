@@ -9,9 +9,11 @@ module Move exposing
     , rank
     , showingSuit
     , startsFromCascade
+    , to
     , toCascade
     , toCell
     , toFoundation
+    , undoMove
     , update
     )
 
@@ -166,6 +168,11 @@ finalize table (Move move) =
                     table
 
 
+undoMove : Move -> Move
+undoMove (Move move) =
+    Move { move | to = move.from, from = move.to }
+
+
 toCascade : Column -> Table -> Move -> Move
 toCascade column table (Move move) =
     let
@@ -198,6 +205,11 @@ color (Move move) =
 rank : Move -> Rank
 rank (Move move) =
     move.rank
+
+
+to : Move -> CardLoc
+to (Move move) =
+    move.to
 
 
 showingSuit : Move -> Suit

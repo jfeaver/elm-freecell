@@ -45,6 +45,7 @@ type alias Game =
     , lastMouseDown : Maybe MouseDownDetail
     , doubleClickLast : Bool
     , focusedCard : Maybe ( CardLoc, Card )
+    , moveHistory : List Move
     }
 
 
@@ -61,6 +62,7 @@ type Msg
     | DefocusCard
     | EndMove (Result Browser.Dom.Error ( Element, Event ))
     | RecordMouseDownTAndP Position ( CardLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
+    | Undo
 
 
 new : Deck -> Game
@@ -74,6 +76,7 @@ new deck =
     , lastMouseDown = Nothing
     , doubleClickLast = False
     , focusedCard = Nothing
+    , moveHistory = []
     }
 
 
@@ -228,6 +231,28 @@ update msg game =
             -- If error finding table element... do nothing.
             ( game, Cmd.none )
 
+        Undo ->
+            case game.moveHistory of
+                theMove :: others ->
+                    let
+                        pickupCards =
+                            pickMovablePile (Move.to theMove) game
+                    in
+                    case pickupCards of
+                        Just ( _, table ) ->
+                            ( { game
+                                | table = Move.finalize table (Move.undoMove theMove)
+                                , moveHistory = others
+                              }
+                            , Cmd.none
+                            )
+
+                        Nothing ->
+                            ( game, Cmd.none )
+
+                _ ->
+                    ( game, Cmd.none )
+
 
 startMove : ( CardLoc, Card ) -> Position -> Game -> Game
 startMove ( cardLoc, card ) position game =
@@ -363,7 +388,11 @@ autoMove game =
             in
             case Maybe.Extra.try4 moveNothing moveToFoundation moveToCascade moveToCell move of
                 Just updatedMove ->
-                    { game | table = Move.finalize game.table updatedMove, state = Ready }
+                    { game
+                        | table = Move.finalize game.table updatedMove
+                        , moveHistory = updatedMove :: game.moveHistory
+                        , state = Ready
+                    }
 
                 Nothing ->
                     game
@@ -556,7 +585,11 @@ endMove mTableLoc move game =
                 Nothing ->
                     move
     in
-    { game | table = Move.finalize game.table theMove, state = Ready }
+    { game
+        | table = Move.finalize game.table theMove
+        , state = Ready
+        , moveHistory = theMove :: game.moveHistory
+    }
 
 
 focusedColumn : Game -> Maybe Column

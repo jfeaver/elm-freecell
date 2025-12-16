@@ -86,11 +86,10 @@ body : Model -> List (Html Msg)
 body model =
     case model of
         MainMenu ->
-            [ header
-            ]
+            []
 
         InGame game ->
-            [ header
+            [ gameActions
             , div
                 [ css
                     [ backgroundColor (hex Table.View.backgroundHex)
@@ -111,10 +110,11 @@ body model =
             ]
 
 
-header : Html Msg
-header =
+gameActions : Html Msg
+gameActions =
     div []
         [ button [ onClick NewGame, css [ cursor pointer ] ] [ text "New Game" ]
+        , button [ onClick (GameMsg Game.Undo), css [ cursor pointer ] ] [ text "Undo" ]
         ]
 
 
