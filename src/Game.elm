@@ -46,6 +46,8 @@ type alias Game =
     , doubleClickLast : Bool
     , focusedCard : Maybe ( CardLoc, Card )
     , moveHistory : List Move
+    , number : Deck.Seed
+    , select : Maybe Deck.DeckSelect
     }
 
 
@@ -80,6 +82,8 @@ new deckSeed =
     , doubleClickLast = False
     , focusedCard = Nothing
     , moveHistory = []
+    , number = deckSeed
+    , select = Nothing
     }
 
 

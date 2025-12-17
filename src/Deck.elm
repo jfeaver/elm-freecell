@@ -9,6 +9,29 @@ type Deck
     = Deck (List Card)
 
 
+{-| If outer maybe is present then the user is selecting a game. The inner maybe represents the user's game selection.
+-}
+type alias DeckSelect =
+    { mParseResult : Maybe (Result String Seed)
+    , input : String
+    }
+
+
+initDeckSelect : DeckSelect
+initDeckSelect =
+    { mParseResult = Nothing, input = "" }
+
+
+deckSelectFromInput : String -> DeckSelect
+deckSelectFromInput stringSeed =
+    case String.toInt stringSeed of
+        Just seed ->
+            { mParseResult = Just (Ok seed), input = stringSeed }
+
+        Nothing ->
+            { mParseResult = Just (Err "Please enter a valid game number."), input = stringSeed }
+
+
 {-| Make a deck of all the cards in a single suit.
 Makes the deck in A-K order
 fullSuit Spades == [ Card Spades Ace, Card Spades Two, Card Spades Three, Card Spades Four, Card Spades Five, Card Spades Six, Card Spades Seven, Card Spades Eight, Card Spades Nine, Card Spades Ten, Card Spades Jack, Card Spades Queen, Card Spades King ]

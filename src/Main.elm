@@ -5,16 +5,17 @@ import Browser exposing (Document)
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.View
 import Cascade exposing (Column, Row)
-import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, noRepeat, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
-import Deck exposing (Deck)
+import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, borderRadius, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, maxWidth, noRepeat, padding, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
+import Deck
 import Game exposing (Game, Msg(..), State(..))
 import Html.Events exposing (onMouseEnter, onMouseLeave)
 import Html.Events.Extra.Mouse exposing (onDown, onMove, onUp)
-import Html.Styled as Html exposing (Html, button, div, text)
-import Html.Styled.Attributes exposing (css, fromUnstyled, id)
-import Html.Styled.Events exposing (onClick)
+import Html.Styled as Html exposing (Html, button, div, h3, text)
+import Html.Styled.Attributes as HA exposing (css, disabled, fromUnstyled, id)
+import Html.Styled.Events exposing (onClick, onInput)
+import Modal
 import Move
-import Pile exposing (Pile)
+import Pile
 import Random
 import Table exposing (CardLoc(..), Cell, Table)
 import Table.View
@@ -32,7 +33,7 @@ main =
 
 
 type Model
-    = MainMenu
+    = MainMenu (Maybe Deck.DeckSelect)
     | InGame Game
 
 
@@ -40,6 +41,9 @@ type Msg
     = SetGame Deck.Seed
     | NewGame
     | GameMsg Game.Msg
+    | SelectGame
+    | SetSelectGame String
+    | CancelSelectGame
 
 
 startGame : Cmd Msg
@@ -49,7 +53,7 @@ startGame =
 
 init : ( Model, Cmd Msg )
 init =
-    ( MainMenu, startGame )
+    ( MainMenu Nothing, startGame )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -74,6 +78,34 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
+        SelectGame ->
+            case model of
+                InGame game ->
+                    ( InGame { game | select = Just Deck.initDeckSelect }, Cmd.none )
+
+                MainMenu _ ->
+                    ( MainMenu (Just Deck.initDeckSelect), Cmd.none )
+
+        CancelSelectGame ->
+            case model of
+                InGame game ->
+                    ( InGame { game | select = Nothing }, Cmd.none )
+
+                MainMenu _ ->
+                    ( MainMenu Nothing, Cmd.none )
+
+        SetSelectGame inputValue ->
+            let
+                select =
+                    Deck.deckSelectFromInput inputValue
+            in
+            case model of
+                InGame game ->
+                    ( InGame { game | select = Just select }, Cmd.none )
+
+                MainMenu _ ->
+                    ( MainMenu (Just select), Cmd.none )
+
 
 view : Model -> Document Msg
 view model =
@@ -85,36 +117,130 @@ view model =
 body : Model -> List (Html Msg)
 body model =
     case model of
-        MainMenu ->
+        MainMenu _ ->
             []
 
         InGame game ->
-            [ gameActions
-            , div
-                [ css
-                    [ backgroundColor (hex Table.View.backgroundHex)
-                    , position relative
-                    , margin auto
-                    , width (px Table.View.width)
-                    , height (px <| Table.View.height + Table.View.expandedPlayHeight game.table)
+            let
+                selectModal =
+                    game.select
+                        |> Maybe.map selectGame
+                        |> Maybe.map (\aDiv -> [ aDiv ])
+                        |> Maybe.withDefault []
+            in
+            List.append selectModal
+                [ gameActions game
+                , div
+                    [ css
+                        [ backgroundColor (hex Table.View.backgroundHex)
+                        , position relative
+                        , margin auto
+                        , width (px Table.View.width)
+                        , height (px <| Table.View.height + Table.View.expandedPlayHeight game.table)
+                        ]
+                    , onMove (MouseMove >> GameMsg) |> fromUnstyled
+                    , onUp (MouseUp >> GameMsg) |> fromUnstyled
+                    , id "table"
                     ]
-                , onMove (MouseMove >> GameMsg) |> fromUnstyled
-                , onUp (MouseUp >> GameMsg) |> fromUnstyled
-                , id "table"
+                    [ cells game
+                    , foundations game
+                    , cascades game
+                    , activeMove game game.state
+                    ]
                 ]
-                [ cells game
-                , foundations game
-                , cascades game
-                , activeMove game game.state
+
+
+selectGame : Deck.DeckSelect -> Html Msg
+selectGame { mParseResult, input } =
+    let
+        mParseResult_ =
+            if String.length input == 0 then
+                Nothing
+
+            else
+                mParseResult
+
+        goButton_ active seed =
+            [ button
+                [ disabled (not active)
+                , onClick (SetGame seed)
+                , css
+                    (if active then
+                        [ Css.backgroundColor (Css.rgb 30 190 0)
+                        , Css.color (Css.rgb 255 255 255)
+                        , Css.fontWeight Css.bold
+                        , Css.cursor Css.pointer
+                        ]
+
+                     else
+                        []
+                    )
                 ]
+                [ text "Go!" ]
             ]
 
+        goButton =
+            case mParseResult_ of
+                Just (Ok seed) ->
+                    goButton_ True seed
 
-gameActions : Html Msg
-gameActions =
+                _ ->
+                    goButton_ False 0
+
+        inputLabel =
+            [ Html.label [] [ text "Game Number:" ]
+            ]
+
+        inputHtml =
+            case mParseResult_ of
+                Just (Err _) ->
+                    [ Html.input [ css [ Css.border3 (px 4) Css.solid (Css.rgb 255 18 18) ], HA.value input, onInput SetSelectGame ] []
+                    ]
+
+                _ ->
+                    [ Html.input [ HA.value input, onInput SetSelectGame ] []
+                    ]
+
+        errorMessage =
+            case mParseResult_ of
+                Just (Err message) ->
+                    [ Html.span [ css [ Css.color (Css.rgb 255 18 18), Css.fontStyle Css.italic ] ] [ text message ] ]
+
+                _ ->
+                    []
+    in
+    div []
+        [ Modal.view
+            []
+            [ div
+                [ css
+                    [ backgroundColor (Css.rgb 255 255 255)
+                    , padding (px 20)
+                    , borderRadius (px 5)
+                    , maxWidth (px 500)
+                    , Css.width (pct 80)
+                    ]
+                ]
+                [ h3 [] [ text "Which game do you want to play?" ]
+                , div [] inputLabel
+                , div []
+                    (inputHtml ++ goButton)
+                , div [] errorMessage
+                , div [ css [ Css.displayFlex, Css.justifyContent Css.end ] ]
+                    [ button [ onClick CancelSelectGame, css [ Css.cursor Css.pointer ] ] [ text "Cancel" ]
+                    ]
+                ]
+            ]
+        ]
+
+
+gameActions : Game -> Html Msg
+gameActions game =
     div []
         [ button [ onClick NewGame, css [ cursor pointer ] ] [ text "New Game" ]
         , button [ onClick (GameMsg Game.Undo), css [ cursor pointer ] ] [ text "Undo" ]
+        , button [ onClick SelectGame, css [ cursor pointer ] ] [ text "Select Game" ]
+        , text ("Playing game number " ++ String.fromInt game.number)
         ]
 
 
