@@ -36,7 +36,7 @@ pickUps =
                         CascadeLoc 0 0
 
                     newGame =
-                        Game.new Deck.fullDeck
+                        Game.new 1
 
                     table =
                         newGame.table
@@ -119,7 +119,7 @@ putDowns =
                         PlayerMove move
 
                     newGame =
-                        Game.new Deck.fullDeck
+                        Game.new 1
 
                     table =
                         newGame.table
