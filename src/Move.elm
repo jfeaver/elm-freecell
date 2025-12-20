@@ -9,6 +9,7 @@ module Move exposing
     , rank
     , showingSuit
     , startsFromCascade
+    , startsFromFoundation
     , to
     , toCascade
     , toCell
@@ -235,3 +236,13 @@ startsFromCascade column (Move { from }) =
 
         _ ->
             False
+
+
+startsFromFoundation : Move -> Maybe Suit
+startsFromFoundation (Move { from }) =
+    case from of
+        FoundationLoc foundation ->
+            Just foundation
+
+        _ ->
+            Nothing

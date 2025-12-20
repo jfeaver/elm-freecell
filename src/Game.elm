@@ -324,12 +324,12 @@ autoMove game =
                         Nothing
 
                 moveToFoundation _ =
-                    -- if can move to a foundation then move to foundation
+                    -- if can move to a foundation then move to foundation (unless it's already there then try moving elsewhere)
                     let
                         suit =
                             Move.showingSuit move
                     in
-                    if validToFoundation game.table move suit then
+                    if Maybe.Extra.isNothing (Move.startsFromFoundation move) && validToFoundation game.table move suit then
                         Just (Move.toFoundation suit move)
 
                     else
@@ -381,7 +381,6 @@ autoMove game =
 
                 moveToCascade _ =
                     -- if a pile has a matching cascade then move to cascade
-                    -- FIXME: automove from foundation to cascade leaves card on foundation (and adds a move to the list)
                     maybeCascade Nothing
                         |> Maybe.map (\( _, column ) -> Move.toCascade column game.table move)
 
@@ -601,7 +600,8 @@ endMove mTableLoc move game =
 focusedPile : Column -> Int -> Int -> Game -> Bool
 focusedPile column pileDepth columnDepth game =
     case game.focusedCard of
-        Just (CascadeLoc focusedColumn focusedRow, _) ->
+        Just ( CascadeLoc focusedColumn focusedRow, _ ) ->
             column == focusedColumn && pileDepth > (columnDepth - focusedRow - 1)
+
         _ ->
             False

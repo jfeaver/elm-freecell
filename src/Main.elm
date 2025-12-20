@@ -428,7 +428,6 @@ cascade game cascadesOffset ( column, cards ) =
                 ]
                 []
 
-
         focused =
             Game.focusedPile column pileDepth columnDepth game
 
