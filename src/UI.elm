@@ -15,8 +15,11 @@ zoomed n =
 
 indicatorWidth : Float
 indicatorWidth =
-    3.0 |> zoomedR
+    5.0 |> zoomedR
 
+cardHighlightWidth : Float
+cardHighlightWidth =
+    3.0 |> zoomedR
 
 indicatorRadius : Float
 indicatorRadius =
@@ -45,7 +48,7 @@ roundToWhole =
 
 pileIndicatorColor : Css.Color
 pileIndicatorColor =
-    Css.rgb 95 199 199
+    Css.rgb 161 255 255
 
 
 pickablePileIndicatorColor : Css.Color

@@ -13,6 +13,7 @@ import Html.Events.Extra.Mouse exposing (onDown, onMove, onUp)
 import Html.Styled as Html exposing (Html, button, div, h3, text)
 import Html.Styled.Attributes as HA exposing (css, disabled, fromUnstyled, id)
 import Html.Styled.Events exposing (onClick, onInput)
+import Maybe.Extra
 import Modal
 import Move
 import Pile
@@ -338,7 +339,8 @@ pileIndicator details mPickablePileDepth =
     in
     mPickablePileDepth
         |> Maybe.andThen mSplitPileIndicator
-        |> Maybe.withDefault (unifiedPileIndicator details Nothing)
+        -- |> Maybe.withDefault (unifiedPileIndicator details Nothing)
+        |> Maybe.withDefault []
 
 
 unifiedPileIndicator : PileIndicatorDetails -> Maybe Css.Color -> List (Html Msg)
@@ -448,7 +450,7 @@ cascade game cascadesOffset ( column, cards ) =
                 Nothing
 
         mPileIndicator =
-            if pileDepth > 1 then
+            if pileDepth > 1  then
                 Just (pileIndicator pileIndicatorDetails mPickablePileDepth)
 
             else
@@ -554,6 +556,7 @@ cardView game cardLoc inPile card =
                 Nothing ->
                     css []
 
+        -- FIXME: moving the mouse really fast doesn't defocus a card
         interaction =
             [ onDown (MouseDown ( cardLoc, card ) >> GameMsg)
             , onMouseEnter (FocusCard ( cardLoc, card ) |> GameMsg)
@@ -574,7 +577,7 @@ cardView game cardLoc inPile card =
                 , css
                     [ margin (px cardHighlightInset)
                     , Css.borderRadius (px (UI.indicatorRadius - cardHighlightInset))
-                    , Css.boxShadow5 (px 0) (px 0) (px (UI.indicatorWidth - 1)) (px UI.indicatorWidth) UI.cardHighlightColor
+                    , Css.boxShadow5 (px 0) (px 0) (px (UI.cardHighlightWidth - 1)) (px UI.cardHighlightWidth) UI.cardHighlightColor
                     ]
                 ]
                 []

@@ -1,6 +1,8 @@
+- FIXME: An automove that moves nothing is added to the move list (needs to be undone) but shouldn't be
 - highlight next foundation card on hover over foundation
 - Win/Loss conditions and messages
 - hitbox drop collisions (versus point collision right now)
+- auto add foundation cards while allowing for undos or an easy toggle to pause the action
 - 50 images are loaded separately!! Let's embed the SVG directly?
 - CSS animations/animation frames (animate cancelled moves and auto moves)
 - Error messages (Can't do that because ...)
