@@ -4,7 +4,7 @@ module Game exposing
     , Msg(..)
     , State(..)
     , endMove
-    , focusedColumn
+    , focusedPile
     , maxPileDepth
     , new
     , startMove
@@ -381,7 +381,7 @@ autoMove game =
 
                 moveToCascade _ =
                     -- if a pile has a matching cascade then move to cascade
-                    -- FIXME: automove from foundation to cascade might be broken
+                    -- FIXME: automove from foundation to cascade leaves card on foundation (and adds a move to the list)
                     maybeCascade Nothing
                         |> Maybe.map (\( _, column ) -> Move.toCascade column game.table move)
 
@@ -477,7 +477,6 @@ cascade either.
 -}
 validPileDepthOnMoveToEmptyCascade : Table -> Move -> Bool
 validPileDepthOnMoveToEmptyCascade table move =
-    -- FIXME: When moving five cards to an empty cascade and there are four free cells then I can't move the stack
     let
         maxCardsToMove emptyCascades emptyCells =
             if Move.isFullCascade move then
@@ -599,16 +598,10 @@ endMove mTableLoc move game =
     }
 
 
-focusedColumn : Game -> Maybe Column
-focusedColumn game =
-    let
-        cardLocToColumn cardLoc =
-            case cardLoc of
-                CascadeLoc column _ ->
-                    Just column
-
-                _ ->
-                    Nothing
-    in
-    game.focusedCard
-        |> Maybe.andThen (\( cardLoc, _ ) -> cardLocToColumn cardLoc)
+focusedPile : Column -> Int -> Int -> Game -> Bool
+focusedPile column pileDepth columnDepth game =
+    case game.focusedCard of
+        Just (CascadeLoc focusedColumn focusedRow, _) ->
+            column == focusedColumn && pileDepth > (columnDepth - focusedRow - 1)
+        _ ->
+            False

@@ -405,6 +405,9 @@ cascade game cascadesOffset ( column, cards ) =
         pileDepth =
             List.length pile
 
+        columnDepth =
+            List.length cards
+
         cascadeOffset =
             cascadesOffset + toFloat column * (Card.View.width + Table.View.padding)
 
@@ -425,18 +428,13 @@ cascade game cascadesOffset ( column, cards ) =
                 ]
                 []
 
-        mFocusedColumn =
-            Game.focusedColumn game
 
         focused =
-            -- FIXME: a focused column doesn't mean the player is focusing on the pile
-            mFocusedColumn
-                |> Maybe.map ((==) column)
-                |> Maybe.withDefault False
+            Game.focusedPile column pileDepth columnDepth game
 
         pileIndicatorDetails : PileIndicatorDetails
         pileIndicatorDetails =
-            { pileDepth = List.length pile
+            { pileDepth = pileDepth
             , rowStart = rowStart
             , indicatorTop = pileIndicatorTop
             , cascadeOffset = cascadeOffset
@@ -445,7 +443,7 @@ cascade game cascadesOffset ( column, cards ) =
 
         mPickablePileDepth =
             if focused then
-                Just (Game.maxPileDepth (List.length cards - List.length pile) game.table)
+                Just (Game.maxPileDepth (columnDepth - pileDepth) game.table)
 
             else
                 Nothing
@@ -468,7 +466,7 @@ cascade game cascadesOffset ( column, cards ) =
     div [] <|
         List.concat
             [ indicators
-            , List.indexedMap (cascadeCardView game (List.length cards) column pileDepth) cards
+            , List.indexedMap (cascadeCardView game columnDepth column pileDepth) cards
             ]
 
 
@@ -486,7 +484,6 @@ cascadeCardView game columnDepth column pileDepth inversedRow =
         row =
             (columnDepth - 1) - inversedRow
 
-        -- FIXME: inPile is false when the card is by itself in a cascade
         inPile =
             inversedRow < pileDepth
     in
@@ -543,7 +540,6 @@ cardView game cardLoc inPile card =
                     case focusedCardLoc of
                         CascadeLoc column row ->
                             if (cardLoc == focusedCardLoc) && validPile column row then
-                                -- FIXME: when valid pile is the entire cascade and is the exact number of movable cards then the top card does not show a pointer
                                 css
                                     [ hover [ cursor pointer ]
                                     ]
