@@ -247,7 +247,7 @@ gameActions game =
 cell : Game -> ( Cell, Maybe Card ) -> Html Msg
 cell game ( cellN, maybeCard ) =
     maybeCard
-        |> Maybe.map (\card -> cardView game (CellLoc cellN) card)
+        |> Maybe.map (\card -> cardView game (CellLoc cellN) False card)
         |> Maybe.withDefault
             (div
                 [ Table.View.cardMark
@@ -299,7 +299,7 @@ foundation game fieldGetter suit =
     in
     case fieldGetter game.table of
         Just card ->
-            cardView game (FoundationLoc suit) card
+            cardView game (FoundationLoc suit) False card
 
         Nothing ->
             div [ Table.View.cardMark, positioning (3 - Card.suitIndex suit) ]
@@ -468,7 +468,7 @@ cascade game cascadesOffset ( column, cards ) =
     div [] <|
         List.concat
             [ indicators
-            , List.indexedMap (cascadeCardView game (List.length cards) column) cards
+            , List.indexedMap (cascadeCardView game (List.length cards) column pileDepth) cards
             ]
 
 
@@ -480,17 +480,21 @@ cascades game =
         |> div []
 
 
-cascadeCardView : Game -> Int -> Column -> Int -> Card -> Html Msg
-cascadeCardView game columnDepth column inversedRow =
+cascadeCardView : Game -> Int -> Column -> Int -> Int -> Card -> Html Msg
+cascadeCardView game columnDepth column pileDepth inversedRow =
     let
         row =
             (columnDepth - 1) - inversedRow
+
+        -- FIXME: inPile is false when the card is by itself in a cascade
+        inPile =
+            inversedRow < pileDepth
     in
-    cardView game (CascadeLoc column row)
+    cardView game (CascadeLoc column row) inPile
 
 
-cardView : Game -> CardLoc -> Card -> Html Msg
-cardView game cardLoc card =
+cardView : Game -> CardLoc -> Bool -> Card -> Html Msg
+cardView game cardLoc inPile card =
     let
         cardImage =
             css
@@ -566,10 +570,9 @@ cardView game cardLoc card =
             List.concat [ interaction, [ cardImage, positioning, sizing 0, hoverOnCard ] ]
 
         cardHighlightInset =
-            1
+            0
 
         cardHighlight =
-            -- TODO: Move borderRadius and box shadow to UI size
             div
                 [ positioning
                 , sizing (cardHighlightInset * 2)
@@ -581,6 +584,24 @@ cardView game cardLoc card =
                 ]
                 []
 
+        isCascade =
+            case cardLoc of
+                CascadeLoc _ _ ->
+                    True
+
+                _ ->
+                    False
+
+        cardShroud =
+            div
+                [ positioning
+                , sizing 0
+                , css
+                    [ Css.backgroundColor (Css.rgba 0 0 0 0.17) ]
+                , onMouseEnter (FocusCard ( cardLoc, card ) |> GameMsg) |> fromUnstyled
+                ]
+                []
+
         isParentOf childLoc parentCardLoc =
             case parentCardLoc of
                 CascadeLoc column row ->
@@ -588,6 +609,11 @@ cardView game cardLoc card =
 
                 _ ->
                     False
+
+        isFocused =
+            game.focusedCard
+                |> Maybe.map (\( focusedCardLoc, _ ) -> cardLoc == focusedCardLoc)
+                |> Maybe.withDefault False
 
         doHighlightCard =
             game.focusedCard
@@ -597,8 +623,11 @@ cardView game cardLoc card =
     if doHighlightCard then
         div [] [ div attrs [], cardHighlight ]
 
-    else
+    else if not isCascade || inPile || isFocused then
         div attrs []
+
+    else
+        div [] [ div attrs [], cardShroud ]
 
 
 activeMove : Game -> Game.State -> Html Msg
@@ -610,7 +639,7 @@ activeMove game state =
         Game.PlayerMove move ->
             let
                 toCardView depth =
-                    cardView game (Hand depth)
+                    cardView game (Hand depth) False
 
                 cardsHtml =
                     Move.indexedMap toCardView move

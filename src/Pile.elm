@@ -45,6 +45,14 @@ pileFinder row remaining pile_ =
             else
                 ( row, List.append pile_ [ top ] )
 
+        top :: [] ->
+            -- A card by itself in a cascade is a pile
+            if List.length pile_ == 0 then
+                ( row, [ top ] )
+
+            else
+                ( row, pile_ )
+
         _ ->
             ( row, pile_ )
 

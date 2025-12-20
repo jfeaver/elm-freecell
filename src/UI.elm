@@ -60,4 +60,4 @@ unpickablePileIndicatorColor =
 
 cardHighlightColor : Css.Color
 cardHighlightColor =
-    Css.rgb 156 201 227
+    Css.rgb 227 218 156
