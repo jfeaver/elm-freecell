@@ -13,7 +13,6 @@ import Html.Events.Extra.Mouse exposing (onDown, onMove, onUp)
 import Html.Styled as Html exposing (Html, button, div, h3, text)
 import Html.Styled.Attributes as HA exposing (css, disabled, fromUnstyled, id)
 import Html.Styled.Events exposing (onClick, onInput)
-import Maybe.Extra
 import Modal
 import Move
 import Pile
@@ -239,6 +238,7 @@ gameActions : Game -> Html Msg
 gameActions game =
     div []
         [ button [ onClick NewGame, css [ cursor pointer ] ] [ text "New Game" ]
+        , button [ onClick (GameMsg Game.Restart), css [ cursor pointer ] ] [ text "Restart" ]
         , button [ onClick (GameMsg Game.Undo), css [ cursor pointer ] ] [ text "Undo" ]
         , button [ onClick SelectGame, css [ cursor pointer ] ] [ text "Select Game" ]
         , text ("Playing game number " ++ String.fromInt game.number)
@@ -450,7 +450,7 @@ cascade game cascadesOffset ( column, cards ) =
                 Nothing
 
         mPileIndicator =
-            if pileDepth > 1  then
+            if pileDepth > 1 then
                 Just (pileIndicator pileIndicatorDetails mPickablePileDepth)
 
             else

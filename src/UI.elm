@@ -17,9 +17,11 @@ indicatorWidth : Float
 indicatorWidth =
     5.0 |> zoomedR
 
+
 cardHighlightWidth : Float
 cardHighlightWidth =
     3.0 |> zoomedR
+
 
 indicatorRadius : Float
 indicatorRadius =

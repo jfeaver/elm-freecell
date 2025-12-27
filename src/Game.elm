@@ -65,6 +65,7 @@ type Msg
     | EndMove (Result Browser.Dom.Error ( Element, Event ))
     | RecordMouseDownTAndP Position ( CardLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
     | Undo
+    | Restart
 
 
 new : Deck.Seed -> Game
@@ -259,6 +260,9 @@ update msg game =
 
                 _ ->
                     ( game, Cmd.none )
+
+        Restart ->
+            ( new game.number, Cmd.none )
 
 
 startMove : ( CardLoc, Card ) -> Position -> Game -> Game

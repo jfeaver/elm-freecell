@@ -2,6 +2,7 @@
 - highlight next foundation card on hover over foundation
 - Win/Loss conditions and messages
 - hitbox drop collisions (versus point collision right now)
+- swap location of cells and foundations
 - auto add foundation cards while allowing for undos or an easy toggle to pause the action
 - 50 images are loaded separately!! Let's embed the SVG directly?
 - CSS animations/animation frames (animate cancelled moves and auto moves)
@@ -9,3 +10,4 @@
 - ignore right click
 - highlight any possible card location other than free cells
 - pulse possible card locations twice and then stop (??)
+- multi-game history
