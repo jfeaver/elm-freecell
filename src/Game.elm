@@ -398,11 +398,15 @@ autoMove game =
             in
             case Maybe.Extra.try4 moveNothing moveToFoundation moveToCascade moveToCell move of
                 Just updatedMove ->
-                    { game
-                        | table = Move.finalize game.table updatedMove
-                        , moveHistory = updatedMove :: game.moveHistory
-                        , state = Ready
-                    }
+                    if Move.isNoOp updatedMove then
+                        { game | state = Ready }
+
+                    else
+                        { game
+                            | table = Move.finalize game.table updatedMove
+                            , moveHistory = updatedMove :: game.moveHistory
+                            , state = Ready
+                        }
 
                 Nothing ->
                     game

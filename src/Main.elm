@@ -8,7 +8,7 @@ import Cascade exposing (Column, Row)
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, borderRadius, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, maxWidth, noRepeat, padding, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck
 import Game exposing (Game, Msg(..), State(..))
-import Html.Events exposing (onMouseEnter, onMouseLeave)
+import Html.Events exposing (onMouseEnter, onMouseLeave, onMouseOver)
 import Html.Events.Extra.Mouse exposing (onDown, onMove, onUp)
 import Html.Styled as Html exposing (Html, button, div, h3, text)
 import Html.Styled.Attributes as HA exposing (css, disabled, fromUnstyled, id)
@@ -574,6 +574,7 @@ cardView game cardLoc inPile card =
             div
                 [ positioning
                 , sizing (cardHighlightInset * 2)
+                , onMouseOver (GameMsg (FocusCard ( cardLoc, card ))) |> fromUnstyled
                 , css
                     [ margin (px cardHighlightInset)
                     , Css.borderRadius (px (UI.indicatorRadius - cardHighlightInset))

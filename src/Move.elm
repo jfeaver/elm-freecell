@@ -4,6 +4,7 @@ module Move exposing
     , finalize
     , indexedMap
     , isFullCascade
+    , isNoOp
     , new
     , pileDepth
     , rank
@@ -246,3 +247,8 @@ startsFromFoundation (Move { from }) =
 
         _ ->
             Nothing
+
+
+isNoOp : Move -> Bool
+isNoOp (Move move) =
+    move.from == move.to
