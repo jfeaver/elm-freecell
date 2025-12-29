@@ -45,6 +45,7 @@ type alias Game =
     , lastMouseDown : Maybe MouseDownDetail
     , doubleClickLast : Bool
     , focusedCard : Maybe ( CardLoc, Card )
+    , focusedFoundation : Maybe Suit
     , moveHistory : List Move
     , number : Deck.Seed
     , select : Maybe Deck.DeckSelect
@@ -62,6 +63,8 @@ type Msg
     | MouseUp Event
     | FocusCard ( CardLoc, Card )
     | DefocusCard
+    | FocusFoundation Suit (Maybe Card)
+    | DefocusFoundation
     | EndMove (Result Browser.Dom.Error ( Element, Event ))
     | RecordMouseDownTAndP Position ( CardLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
     | Undo
@@ -82,6 +85,7 @@ new deckSeed =
     , lastMouseDown = Nothing
     , doubleClickLast = False
     , focusedCard = Nothing
+    , focusedFoundation = Nothing
     , moveHistory = []
     , number = deckSeed
     , select = Nothing
@@ -178,6 +182,17 @@ update msg game =
 
         DefocusCard ->
             ( { game | focusedCard = Nothing }, Cmd.none )
+
+        FocusFoundation suit mCard ->
+            case mCard of
+                Just card ->
+                    ( { game | focusedFoundation = Just suit, focusedCard = Just ( FoundationLoc card.suit, card ) }, Cmd.none )
+
+                Nothing ->
+                    ( { game | focusedFoundation = Just suit }, Cmd.none )
+
+        DefocusFoundation ->
+            ( { game | focusedFoundation = Nothing, focusedCard = Nothing }, Cmd.none )
 
         EndMove result ->
             case result of

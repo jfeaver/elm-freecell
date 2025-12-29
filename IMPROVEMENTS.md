@@ -1,5 +1,5 @@
-- FIXME: An automove that moves nothing is added to the move list (needs to be undone) but shouldn't be
-- highlight next foundation card on hover over foundation
+- highlight foundation where a hovered card could go
+- autoplace foundation cards (with option to only autoplace non-dependent cards)
 - Win/Loss conditions and messages
 - hitbox drop collisions (versus point collision right now)
 - swap location of cells and foundations

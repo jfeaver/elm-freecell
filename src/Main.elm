@@ -3,6 +3,7 @@ module Main exposing (..)
 import Array
 import Browser exposing (Document)
 import Card exposing (Card, Rank(..), Suit(..))
+import Card.Rank
 import Card.View
 import Cascade exposing (Column, Row)
 import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, borderRadius, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, maxWidth, noRepeat, padding, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
@@ -17,7 +18,7 @@ import Modal
 import Move
 import Pile
 import Random
-import Table exposing (CardLoc(..), Cell, Table)
+import Table exposing (CardLoc(..), Cell, Table, TableLoc(..))
 import Table.View
 import UI
 
@@ -303,9 +304,33 @@ foundation game fieldGetter suit =
             cardView game (FoundationLoc suit) False card
 
         Nothing ->
-            div [ Table.View.cardMark, positioning (3 - Card.suitIndex suit) ]
+            div ([ Table.View.cardMark, positioning (3 - Card.suitIndex suit) ] ++ foundationInteraction suit Nothing)
                 [ div [ cardIcon (Card.View.suitIconSrc suit) ] []
                 ]
+
+
+mouseDownInteraction : ( CardLoc, Card ) -> List (Html.Attribute Msg)
+mouseDownInteraction locatedCard =
+    [ onDown (MouseDown locatedCard >> GameMsg) |> fromUnstyled ]
+
+
+foundationInteraction : Suit -> Maybe Card -> List (Html.Attribute Msg)
+foundationInteraction suit mCard =
+    let
+        mouseDownInteraction_ =
+            case mCard of
+                Just card ->
+                    mouseDownInteraction ( FoundationLoc suit, card )
+
+                Nothing ->
+                    []
+    in
+    mouseDownInteraction_
+        ++ ([ onMouseEnter (FocusFoundation suit mCard |> GameMsg)
+            , onMouseLeave (DefocusFoundation |> GameMsg)
+            ]
+                |> List.map fromUnstyled
+           )
 
 
 foundations : Game -> Html Msg
@@ -556,13 +581,21 @@ cardView game cardLoc inPile card =
                 Nothing ->
                     css []
 
-        -- FIXME: moving the mouse really fast doesn't defocus a card
+        typicalInteraction =
+            mouseDownInteraction ( cardLoc, card )
+                ++ ([ onMouseEnter (FocusCard ( cardLoc, card ) |> GameMsg)
+                    , onMouseLeave (DefocusCard |> GameMsg)
+                    ]
+                        |> List.map fromUnstyled
+                   )
+
         interaction =
-            [ onDown (MouseDown ( cardLoc, card ) >> GameMsg)
-            , onMouseEnter (FocusCard ( cardLoc, card ) |> GameMsg)
-            , onMouseLeave (DefocusCard |> GameMsg)
-            ]
-                |> List.map fromUnstyled
+            case cardLoc of
+                FoundationLoc suit ->
+                    foundationInteraction suit (Just card)
+
+                _ ->
+                    typicalInteraction
 
         attrs =
             List.concat [ interaction, [ cardImage, positioning, sizing 0, hoverOnCard ] ]
@@ -614,10 +647,23 @@ cardView game cardLoc inPile card =
                 |> Maybe.map (\( focusedCardLoc, _ ) -> cardLoc == focusedCardLoc)
                 |> Maybe.withDefault False
 
-        doHighlightCard =
+        cardIsntAncestorOfFocusedCard =
             game.focusedCard
                 |> Maybe.map (\( focusedCardLoc, focusedCard ) -> Pile.validPile [ focusedCard, card ] && not (isParentOf focusedCardLoc cardLoc))
                 |> Maybe.withDefault False
+
+        isNextFoundationalCard suit =
+            Table.getTableCard (TableFoundation suit) game.table
+                |> Maybe.map (\currentFoundationalCard -> currentFoundationalCard.suit == card.suit && Card.Rank.increment currentFoundationalCard.rank == card.rank)
+                |> Maybe.withDefault (card.suit == suit && card.rank == Ace)
+
+        highlightNextFoundationalCard =
+            game.focusedFoundation
+                |> Maybe.map isNextFoundationalCard
+                |> Maybe.withDefault False
+
+        doHighlightCard =
+            cardIsntAncestorOfFocusedCard || highlightNextFoundationalCard
     in
     if doHighlightCard then
         div [] [ div attrs [], cardHighlight ]
