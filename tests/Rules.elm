@@ -1,12 +1,12 @@
-module Rules exposing (pickUps, putDowns)
+module Rules exposing (autosolver, pickUps, putDowns)
 
 import Array
 import Card exposing (Card, Rank(..), Suit(..))
-import Deck
 import Expect
-import Game exposing (State(..))
+import Game exposing (Msg(..), State(..))
 import Move
-import Table exposing (CardLoc(..), TableLoc(..))
+import Move.Autosolve exposing (AutosolveOption(..))
+import Table exposing (CardLoc(..), Table, TableLoc(..))
 import Test exposing (..)
 
 
@@ -36,7 +36,7 @@ pickUps =
                         CascadeLoc 0 0
 
                     newGame =
-                        Game.new 1
+                        Game.new 1 NoAutosolve
 
                     table =
                         newGame.table
@@ -119,7 +119,7 @@ putDowns =
                         PlayerMove move
 
                     newGame =
-                        Game.new 1
+                        Game.new 1 NoAutosolve
 
                     table =
                         newGame.table
@@ -141,4 +141,107 @@ putDowns =
                     |> Maybe.withDefault [ pickedCard ]
                     |> List.length
                     |> Expect.equal 0
+        ]
+
+
+autosolver : Test
+autosolver =
+    describe "Cards moved to foundations by the autosolver in NonSupporting mode"
+        [ test "cards whose rank is greater than the minimal foundation rank of the other color by more than 2 is not auto solved while lesser cards are auto solved." <|
+            \_ ->
+                let
+                    -- 4 diamonds when 2 clubs and 2 spades are in foundations but 5 diamonds is too big
+                    card suit rank =
+                        Card ( 0, 0 ) 0 suit rank
+
+                    threeDiamonds =
+                        card Diamonds Three
+
+                    fourDiamonds =
+                        card Diamonds Four
+
+                    fiveDiamonds =
+                        card Diamonds Five
+
+                    twoClubs =
+                        card Clubs Two
+
+                    twoSpades =
+                        card Spades Two
+
+                    fourHearts =
+                        card Hearts Four
+
+                    emptyGame =
+                        Game.new 1 NonSupporting
+
+                    table : Table
+                    table =
+                        emptyGame.table
+                            |> (\t ->
+                                    { t
+                                        | diamonds = Just threeDiamonds
+                                        , clubs = Just twoClubs
+                                        , spades = Just twoSpades
+                                        , hearts = Just fourHearts
+                                        , cells = Array.fromList [ Just fiveDiamonds, Just fourDiamonds ]
+                                    }
+                               )
+
+                    updatedGame =
+                        { emptyGame | table = table } |> Game.update Autosolve |> Tuple.first
+                in
+                updatedGame.table.diamonds
+                    |> Maybe.map .rank
+                    |> Expect.equal (Just Four)
+        , test "cards whose rank is greater than the foundation rank of the matching color pair by more than 3 is not auto solved while lesser cards are auto solved." <|
+            \_ ->
+                let
+                    -- 6 diamonds when 2 hearts is maximum hearts foundation card since 4 hearts needs to be supported by a black five and six needs to support that five
+                    card suit rank =
+                        Card ( 0, 0 ) 0 suit rank
+
+                    threeDiamonds =
+                        card Diamonds Three
+
+                    fourDiamonds =
+                        card Diamonds Four
+
+                    fiveDiamonds =
+                        card Diamonds Five
+
+                    sixDiamonds =
+                        card Diamonds Six
+
+                    fourClubs =
+                        card Clubs Four
+
+                    fourSpades =
+                        card Spades Four
+
+                    twoHearts =
+                        card Hearts Two
+
+                    emptyGame =
+                        Game.new 1 NonSupporting
+
+                    table : Table
+                    table =
+                        emptyGame.table
+                            |> (\t ->
+                                    { t
+                                        | diamonds = Just threeDiamonds
+                                        , clubs = Just fourClubs
+                                        , spades = Just fourSpades
+                                        , hearts = Just twoHearts
+                                        , cells = Array.fromList [ Just sixDiamonds, Just fiveDiamonds, Just fourDiamonds ]
+                                    }
+                               )
+
+                    updatedGame =
+                        { emptyGame | table = table } |> Game.update Autosolve |> Tuple.first
+                in
+                updatedGame.table.diamonds
+                    |> Maybe.map .rank
+                    |> Expect.equal (Just Five)
         ]

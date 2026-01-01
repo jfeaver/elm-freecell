@@ -3,6 +3,7 @@ module Card.Color exposing
     , fromCard
     , fromPileTop
     , notColor
+    , suits
     )
 
 import Card exposing (Card, Suit(..))
@@ -63,3 +64,13 @@ fromPileTop pile =
                 headColor
     in
     Maybe.map toTop (fromPile pile)
+
+
+suits : CardColor -> ( Suit, Suit )
+suits color =
+    case color of
+        Red ->
+            ( Diamonds, Hearts )
+
+        Black ->
+            ( Clubs, Spades )

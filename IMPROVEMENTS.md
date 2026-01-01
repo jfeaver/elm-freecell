@@ -1,13 +1,12 @@
+- FIXME: A manual move that undos an autosolver move or triggers the autosolver to reverse the move should turn off autosolving instead
 - highlight foundation where a hovered card could go
-- autoplace foundation cards (with option to only autoplace non-dependent cards)
 - Win/Loss conditions and messages
 - hitbox drop collisions (versus point collision right now)
 - swap location of cells and foundations
-- auto add foundation cards while allowing for undos or an easy toggle to pause the action
+- menu for all my actions
+- add a redo
 - 50 images are loaded separately!! Let's embed the SVG directly?
-- CSS animations/animation frames (animate cancelled moves and auto moves)
+- CSS animations/animation frames (animate cancelled moves, auto moves, autosolved moves)
 - Error messages (Can't do that because ...)
 - ignore right click
-- highlight any possible card location other than free cells
-- pulse possible card locations twice and then stop (??)
 - multi-game history

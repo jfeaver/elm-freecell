@@ -3,110 +3,114 @@ module Card.Rank exposing (decrementCard, increment, incrementN)
 import Card exposing (Card, Rank(..))
 
 
-increment : Rank -> Rank
-increment rank =
+toValue : Rank -> Int
+toValue rank =
     case rank of
         Ace ->
-            Two
+            1
 
         Two ->
-            Three
+            2
 
         Three ->
-            Four
+            3
 
         Four ->
-            Five
+            4
 
         Five ->
-            Six
+            5
 
         Six ->
-            Seven
+            6
 
         Seven ->
-            Eight
+            7
 
         Eight ->
-            Nine
+            8
 
         Nine ->
-            Ten
+            9
 
         Ten ->
-            Jack
+            10
 
         Jack ->
-            Queen
+            11
 
         Queen ->
-            King
+            12
 
         King ->
-            Infinite
+            13
 
         Infinite ->
+            14
+
+
+fromValue : Int -> Rank
+fromValue n =
+    case n of
+        1 ->
+            Ace
+
+        2 ->
+            Two
+
+        3 ->
+            Three
+
+        4 ->
+            Four
+
+        5 ->
+            Five
+
+        6 ->
+            Six
+
+        7 ->
+            Seven
+
+        8 ->
+            Eight
+
+        9 ->
+            Nine
+
+        10 ->
+            Ten
+
+        11 ->
+            Jack
+
+        12 ->
+            Queen
+
+        13 ->
+            King
+
+        _ ->
             Infinite
 
 
-doIncrementN : Int -> Int -> Rank -> Rank
-doIncrementN i n rank =
-    if i < n then
-        doIncrementN (i + 1) n (increment rank)
-
-    else
-        rank
+increment : Rank -> Rank
+increment rank =
+    incrementN 1 rank
 
 
 incrementN : Int -> Rank -> Rank
-incrementN =
-    doIncrementN 0
+incrementN n rank =
+    rank
+        |> toValue
+        |> (+) n
+        |> fromValue
 
 
 decrement : Rank -> Rank
 decrement rank =
-    case rank of
-        Ace ->
-            King
-
-        Two ->
-            Ace
-
-        Three ->
-            Two
-
-        Four ->
-            Three
-
-        Five ->
-            Four
-
-        Six ->
-            Five
-
-        Seven ->
-            Six
-
-        Eight ->
-            Seven
-
-        Nine ->
-            Eight
-
-        Ten ->
-            Nine
-
-        Jack ->
-            Ten
-
-        Queen ->
-            Jack
-
-        King ->
-            Queen
-
-        Infinite ->
-            Infinite
+    incrementN -1 rank
 
 
 decrementCard : Card -> Maybe Card

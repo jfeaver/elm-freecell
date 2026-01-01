@@ -6,16 +6,17 @@ import Card exposing (Card, Rank(..), Suit(..))
 import Card.Rank
 import Card.View
 import Cascade exposing (Column, Row)
-import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, borderRadius, contain, cursor, display, height, hex, hover, inlineBlock, int, left, margin, maxWidth, noRepeat, padding, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
+import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, borderRadius, contain, cursor, display, height, hex, hover, inline, inlineBlock, int, left, margin, maxWidth, noRepeat, padding, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
 import Deck
 import Game exposing (Game, Msg(..), State(..))
 import Html.Events exposing (onMouseEnter, onMouseLeave, onMouseOver)
 import Html.Events.Extra.Mouse exposing (onDown, onMove, onUp)
-import Html.Styled as Html exposing (Html, button, div, h3, text)
-import Html.Styled.Attributes as HA exposing (css, disabled, fromUnstyled, id)
+import Html.Styled as Html exposing (Html, button, div, h3, input, label, text)
+import Html.Styled.Attributes as HA exposing (checked, css, disabled, for, fromUnstyled, id, name, type_)
 import Html.Styled.Events exposing (onClick, onInput)
 import Modal
 import Move
+import Move.Autosolve exposing (AutosolveOption(..))
 import Pile
 import Random
 import Table exposing (CardLoc(..), Cell, Table, TableLoc(..))
@@ -63,9 +64,9 @@ update msg model =
         SetGame deckSeed ->
             let
                 game =
-                    Game.new deckSeed
+                    Game.new deckSeed NonSupporting
             in
-            ( InGame game, Cmd.none )
+            update (GameMsg Autosolve) (InGame game)
 
         NewGame ->
             ( model, startGame )
@@ -235,6 +236,19 @@ selectGame { mParseResult, input } =
         ]
 
 
+autosolveOptions : Game -> Html Msg
+autosolveOptions game =
+    div [ css [ display inline ] ]
+        [ text "Auto-solver?"
+        , label [ for "NoAutosolve", onClick (GameMsg (Prefer NoAutosolve)) ] [ text "Off" ]
+        , input [ id "NoAutosolve", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer NoAutosolve)), checked (game.autosolvePreference == NoAutosolve) ] [ text "None" ]
+        , label [ for "NonSupporting", onClick (GameMsg (Prefer NonSupporting)) ] [ text "Non-Supporting" ]
+        , input [ id "NonDependent", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer NonSupporting)), checked (game.autosolvePreference == NonSupporting) ] [ text "Non-Dependent" ]
+        , label [ for "AllAutosolve", onClick (GameMsg (Prefer AllAutosolve)) ] [ text "Always" ]
+        , input [ id "AllAutosolve", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer AllAutosolve)), checked (game.autosolvePreference == AllAutosolve) ] [ text "All" ]
+        ]
+
+
 gameActions : Game -> Html Msg
 gameActions game =
     div []
@@ -243,6 +257,7 @@ gameActions game =
         , button [ onClick (GameMsg Game.Undo), css [ cursor pointer ] ] [ text "Undo" ]
         , button [ onClick SelectGame, css [ cursor pointer ] ] [ text "Select Game" ]
         , text ("Playing game number " ++ String.fromInt game.number)
+        , autosolveOptions game
         ]
 
 
@@ -364,7 +379,6 @@ pileIndicator details mPickablePileDepth =
     in
     mPickablePileDepth
         |> Maybe.andThen mSplitPileIndicator
-        -- |> Maybe.withDefault (unifiedPileIndicator details Nothing)
         |> Maybe.withDefault []
 
 

@@ -22,6 +22,7 @@ import Html.Events.Extra.Mouse exposing (Event)
 import List.Extra
 import Maybe.Extra
 import Move exposing (Move)
+import Move.Autosolve exposing (AutosolveOption(..))
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Cell, Table, TableLoc(..))
 import Table.View
@@ -39,6 +40,11 @@ type alias MouseDownDetail =
     }
 
 
+type State
+    = Ready
+    | PlayerMove Move
+
+
 type alias Game =
     { table : Table
     , state : State
@@ -49,12 +55,8 @@ type alias Game =
     , moveHistory : List Move
     , number : Deck.Seed
     , select : Maybe Deck.DeckSelect
+    , autosolvePreference : AutosolveOption
     }
-
-
-type State
-    = Ready
-    | PlayerMove Move
 
 
 type Msg
@@ -69,10 +71,12 @@ type Msg
     | RecordMouseDownTAndP Position ( CardLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
     | Undo
     | Restart
+    | Prefer AutosolveOption
+    | Autosolve
 
 
-new : Deck.Seed -> Game
-new deckSeed =
+new : Deck.Seed -> AutosolveOption -> Game
+new deckSeed autosolvePreference =
     let
         table =
             Table.new 4 8
@@ -89,7 +93,9 @@ new deckSeed =
     , moveHistory = []
     , number = deckSeed
     , select = Nothing
+    , autosolvePreference = autosolvePreference
     }
+        |> autosolve
 
 
 doubleClickUpdate : Game -> MouseDownDetail -> Position -> ( Game, Cmd Msg )
@@ -121,13 +127,21 @@ doubleClickUpdate game mouseDownDetail tablePosition =
 
         defocus _ =
             update DefocusCard autoMoveGame
-    in
-    case mNextLocatedCard of
-        Just locatedCard ->
-            refocusCard locatedCard
 
-        Nothing ->
-            defocus ()
+        updateFocus =
+            case mNextLocatedCard of
+                Just locatedCard ->
+                    refocusCard locatedCard
+
+                Nothing ->
+                    defocus ()
+    in
+    updateFocus |> Tuple.mapSecond (\_ -> performMessage Autosolve)
+
+
+performMessage : msg -> Cmd msg
+performMessage msg =
+    Task.perform identity (Task.succeed msg)
 
 
 update : Msg -> Game -> ( Game, Cmd Msg )
@@ -212,7 +226,7 @@ update msg game =
                                 mLastCardLoc =
                                     Table.View.locFor game.table mouseUpTablePosition
                             in
-                            ( endMove mLastCardLoc move game, Cmd.none )
+                            ( endMove mLastCardLoc move game, performMessage Autosolve )
 
                 Err _ ->
                     ( game, Cmd.none )
@@ -260,12 +274,20 @@ update msg game =
                     let
                         pickupCards =
                             pickMovablePile (Move.to theMove) game
+
+                        updatedAutosolvePreference =
+                            if Move.wasAutosolved theMove then
+                                NoAutosolve
+
+                            else
+                                game.autosolvePreference
                     in
                     case pickupCards of
                         Just ( _, table ) ->
                             ( { game
-                                | table = Move.finalize table (Move.undoMove theMove)
+                                | table = Move.undo table theMove
                                 , moveHistory = others
+                                , autosolvePreference = updatedAutosolvePreference
                               }
                             , Cmd.none
                             )
@@ -277,7 +299,50 @@ update msg game =
                     ( game, Cmd.none )
 
         Restart ->
-            ( new game.number, Cmd.none )
+            ( new game.number game.autosolvePreference, Cmd.none )
+
+        Prefer autosolvePreference ->
+            ( { game | autosolvePreference = autosolvePreference }, performMessage Autosolve )
+
+        Autosolve ->
+            ( autosolve game, Cmd.none )
+
+
+autosolve : Game -> Game
+autosolve game =
+    let
+        mMove _ =
+            Move.autosolve game.table game.autosolvePreference
+
+        pickupCardForMove ( move, cardLoc ) =
+            case Table.pickPile cardLoc game.table of
+                Just ( _, table ) ->
+                    ( move, table )
+
+                Nothing ->
+                    ( move, game.table )
+
+        putdownCardOnFoundation ( theMove, table ) =
+            Move.finalize table theMove
+
+        updateGame move table =
+            { game | table = table, moveHistory = move :: game.moveHistory }
+    in
+    case game.autosolvePreference of
+        NoAutosolve ->
+            game
+
+        _ ->
+            case mMove () of
+                Just ( move, cardLoc ) ->
+                    ( move, cardLoc )
+                        |> pickupCardForMove
+                        |> putdownCardOnFoundation
+                        |> updateGame move
+                        |> autosolve
+
+                Nothing ->
+                    game
 
 
 startMove : ( CardLoc, Card ) -> Position -> Game -> Game

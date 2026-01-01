@@ -55,3 +55,19 @@ suitIndex suit =
 
         Spades ->
             3
+
+
+colorPairedSuit : Suit -> Suit
+colorPairedSuit suit =
+    case suit of
+        Diamonds ->
+            Hearts
+
+        Clubs ->
+            Spades
+
+        Hearts ->
+            Diamonds
+
+        Spades ->
+            Clubs

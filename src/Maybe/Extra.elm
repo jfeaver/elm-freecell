@@ -75,3 +75,20 @@ try3 firstTrial secondTrial thirdTrial =
 try4 : (a -> Maybe b) -> (a -> Maybe b) -> (a -> Maybe b) -> (a -> Maybe b) -> a -> Maybe b
 try4 firstTrial secondTrial thirdTrial fourthTrial =
     try2 (try3 firstTrial secondTrial thirdTrial) fourthTrial
+
+
+{-| Filter checks a maybe's value to pass the provided condition. If it doesn't pass then the
+maybe is turned into a Nothing.
+-}
+filter : (a -> Bool) -> Maybe a -> Maybe a
+filter fn maybe =
+    maybe
+        |> Maybe.map
+            (\thing ->
+                if fn thing then
+                    Just thing
+
+                else
+                    Nothing
+            )
+        |> Maybe.withDefault Nothing
