@@ -4,6 +4,7 @@ module Move exposing
     , color
     , finalize
     , indexedMap
+    , isDestructiveAutoSolveMove
     , isFullCascade
     , isNoOp
     , new
@@ -271,6 +272,21 @@ wasAutosolved move =
 
         _ ->
             False
+
+
+isDestructiveAutoSolveMove : Move -> Move -> Bool
+isDestructiveAutoSolveMove move manualMove =
+    case manualMove of
+        Autosolve _ ->
+            False
+
+        Manual previousMove ->
+            case move of
+                Manual _ ->
+                    False
+
+                Autosolve autosolveMove ->
+                    previousMove.to == autosolveMove.from
 
 
 update : Position -> Move -> Move

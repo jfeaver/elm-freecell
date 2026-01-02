@@ -327,6 +327,12 @@ autosolve tableRelativeMousePosition game =
 
         updateGame move table =
             { game | table = table, moveHistory = move :: game.moveHistory }
+
+        -- autosolver should abort if its next move reverts the previous move
+        shouldAbortAutsolver move =
+            List.head game.moveHistory
+                |> Maybe.map (Move.isDestructiveAutoSolveMove move)
+                |> Maybe.withDefault False
     in
     case game.autosolvePreference of
         NoAutosolve ->
@@ -335,11 +341,17 @@ autosolve tableRelativeMousePosition game =
         _ ->
             case mMove () of
                 Just ( move, cardLoc ) ->
-                    ( move, cardLoc )
-                        |> pickupCardForMove
-                        |> putdownCardOnFoundation
-                        |> updateGame move
-                        |> autosolve tableRelativeMousePosition
+                    if shouldAbortAutsolver move then
+                        game
+                            |> updateFocus tableRelativeMousePosition
+                            |> (\g -> { g | autosolvePreference = NoAutosolve })
+
+                    else
+                        ( move, cardLoc )
+                            |> pickupCardForMove
+                            |> putdownCardOnFoundation
+                            |> updateGame move
+                            |> autosolve tableRelativeMousePosition
 
                 Nothing ->
                     game
