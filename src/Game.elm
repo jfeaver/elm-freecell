@@ -72,7 +72,7 @@ type Msg
     | Undo
     | Restart
     | Prefer AutosolveOption
-    | Autosolve
+    | Autosolve Position
 
 
 new : Deck.Seed -> AutosolveOption -> Game
@@ -95,11 +95,11 @@ new deckSeed autosolvePreference =
     , select = Nothing
     , autosolvePreference = autosolvePreference
     }
-        |> autosolve
+        |> autosolve ( 0, 0 )
 
 
 doubleClickUpdate : Game -> MouseDownDetail -> Position -> ( Game, Cmd Msg )
-doubleClickUpdate game mouseDownDetail tablePosition =
+doubleClickUpdate game mouseDownDetail tableRelativeMousePosition =
     let
         autoMoveGame =
             game
@@ -107,37 +107,36 @@ doubleClickUpdate game mouseDownDetail tablePosition =
                 |> autoMove
                 |> Maybe.withDefault game
                 |> (\updatedGame -> { updatedGame | doubleClickLast = True })
+    in
+    autoMoveGame
+        |> updateFocus tableRelativeMousePosition
+        |> (\updatedGame -> ( updatedGame, performMessage (Autosolve tableRelativeMousePosition) ))
 
+
+updateFocus : Position -> Game -> Game
+updateFocus tableRelativeMousePosition game =
+    let
         -- see if click is a cascade location
         -- check if that cascade location is the last cascade card
         -- focus on that card
         mNextCardLoc =
-            Table.View.locFor autoMoveGame.table tablePosition
+            Table.View.locFor game.table tableRelativeMousePosition
 
         mLocatedTableCard tCardLoc =
-            autoMoveGame.table
+            game.table
                 |> Table.getTableCard tCardLoc
                 |> Maybe.map (\card -> ( Table.tableCardLocToCardLoc tCardLoc, card ))
 
         mNextLocatedCard =
             mNextCardLoc
                 |> Maybe.andThen mLocatedTableCard
-
-        refocusCard card =
-            update (FocusCard card) autoMoveGame
-
-        defocus _ =
-            update DefocusCard autoMoveGame
-
-        updateFocus =
-            case mNextLocatedCard of
-                Just locatedCard ->
-                    refocusCard locatedCard
-
-                Nothing ->
-                    defocus ()
     in
-    updateFocus |> Tuple.mapSecond (\_ -> performMessage Autosolve)
+    case mNextLocatedCard of
+        Just locatedCard ->
+            { game | focusedCard = Just locatedCard }
+
+        Nothing ->
+            { game | focusedCard = Nothing }
 
 
 performMessage : msg -> Cmd msg
@@ -227,7 +226,7 @@ update msg game =
                                 mLastCardLoc =
                                     Table.View.locFor game.table mouseUpTablePosition
                             in
-                            ( endMove mLastCardLoc move game, performMessage Autosolve )
+                            ( endMove mLastCardLoc move game, performMessage (Autosolve mouseUpTablePosition) )
 
                 Err _ ->
                     ( game, Cmd.none )
@@ -303,14 +302,14 @@ update msg game =
             ( new game.number game.autosolvePreference, Cmd.none )
 
         Prefer autosolvePreference ->
-            ( { game | autosolvePreference = autosolvePreference }, performMessage Autosolve )
+            ( { game | autosolvePreference = autosolvePreference }, performMessage (Autosolve ( 0, 0 )) )
 
-        Autosolve ->
-            ( autosolve game, Cmd.none )
+        Autosolve tableRelativeMousePosition ->
+            ( autosolve tableRelativeMousePosition game, Cmd.none )
 
 
-autosolve : Game -> Game
-autosolve game =
+autosolve : Position -> Game -> Game
+autosolve tableRelativeMousePosition game =
     let
         mMove _ =
             Move.autosolve game.table game.autosolvePreference
@@ -340,10 +339,11 @@ autosolve game =
                         |> pickupCardForMove
                         |> putdownCardOnFoundation
                         |> updateGame move
-                        |> autosolve
+                        |> autosolve tableRelativeMousePosition
 
                 Nothing ->
                     game
+                        |> updateFocus tableRelativeMousePosition
 
 
 startMove : ( CardLoc, Card ) -> Position -> Game -> Game

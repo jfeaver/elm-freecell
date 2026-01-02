@@ -180,7 +180,7 @@ isAutosolveable table autosolvePreference card =
                     suitValueMapper card.suit < sameColorFoundationValue + 3
             in
             case autosolvePreference of
-                AllAutosolve ->
+                AlwaysAutosolve ->
                     incrementsRank
 
                 NonSupporting ->

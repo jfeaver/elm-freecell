@@ -66,7 +66,7 @@ update msg model =
                 game =
                     Game.new deckSeed NonSupporting
             in
-            update (GameMsg Autosolve) (InGame game)
+            update (GameMsg (Autosolve ( 0, 0 ))) (InGame game)
 
         NewGame ->
             ( model, startGame )
@@ -244,8 +244,8 @@ autosolveOptions game =
         , input [ id "NoAutosolve", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer NoAutosolve)), checked (game.autosolvePreference == NoAutosolve) ] [ text "None" ]
         , label [ for "NonSupporting", onClick (GameMsg (Prefer NonSupporting)) ] [ text "Non-Supporting" ]
         , input [ id "NonDependent", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer NonSupporting)), checked (game.autosolvePreference == NonSupporting) ] [ text "Non-Dependent" ]
-        , label [ for "AllAutosolve", onClick (GameMsg (Prefer AllAutosolve)) ] [ text "Always" ]
-        , input [ id "AllAutosolve", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer AllAutosolve)), checked (game.autosolvePreference == AllAutosolve) ] [ text "All" ]
+        , label [ for "AllAutosolve", onClick (GameMsg (Prefer AlwaysAutosolve)) ] [ text "Always" ]
+        , input [ id "AllAutosolve", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer AlwaysAutosolve)), checked (game.autosolvePreference == AlwaysAutosolve) ] [ text "All" ]
         ]
 
 

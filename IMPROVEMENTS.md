@@ -1,5 +1,4 @@
 - FIXME: A manual move that undos an autosolver move or triggers the autosolver to reverse the move should turn off autosolving instead
-- FIXME: Autosolved cards that were focused previously are not defocused
 - highlight foundation where a hovered card could go
 - Win/Loss conditions and messages
 - hitbox drop collisions (versus point collision right now)
