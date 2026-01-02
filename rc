@@ -1,3 +1,8 @@
 server() {
-  elm-live src/Main.elm
+  local file="${1:-src/Main.elm}"
+  elm-live "$file"
+}
+
+debug() {
+  server src/ManualTest.elm
 }
