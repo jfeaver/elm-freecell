@@ -1,9 +1,11 @@
 - FIXME: A manual move that undos an autosolver move or triggers the autosolver to reverse the move should turn off autosolving instead
+- FIXME: Autosolved cards that were focused previously are not defocused
 - highlight foundation where a hovered card could go
 - Win/Loss conditions and messages
 - hitbox drop collisions (versus point collision right now)
 - swap location of cells and foundations
 - menu for all my actions
+- prefer auto moves to cascades that are piles from the very top
 - add a redo
 - 50 images are loaded separately!! Let's embed the SVG directly?
 - CSS animations/animation frames (animate cancelled moves, auto moves, autosolved moves)

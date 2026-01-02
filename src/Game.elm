@@ -105,6 +105,7 @@ doubleClickUpdate game mouseDownDetail tablePosition =
             game
                 |> startMove mouseDownDetail.locatedCard mouseDownDetail.position
                 |> autoMove
+                |> Maybe.withDefault game
                 |> (\updatedGame -> { updatedGame | doubleClickLast = True })
 
         -- see if click is a cascade location
@@ -395,7 +396,9 @@ updateMouseMove position game =
             { game | state = PlayerMove (Move.update position lastMove) }
 
 
-autoMove : Game -> Game
+{-| autoMove only returns a game if a move succeeded.
+-}
+autoMove : Game -> Maybe Game
 autoMove game =
     case game.state of
         PlayerMove move ->
@@ -476,23 +479,23 @@ autoMove game =
                     maybeFreeCell Nothing
                         |> Maybe.map (\cell -> Move.toCell cell move)
             in
-            case Maybe.Extra.try4 moveNothing moveToFoundation moveToCascade moveToCell move of
-                Just updatedMove ->
-                    if Move.isNoOp updatedMove then
-                        { game | state = Ready }
+            Maybe.Extra.try4 moveNothing moveToFoundation moveToCascade moveToCell move
+                |> Maybe.andThen
+                    (\updatedMove ->
+                        if Move.isNoOp updatedMove then
+                            Nothing
 
-                    else
-                        { game
-                            | table = Move.finalize game.table updatedMove
-                            , moveHistory = updatedMove :: game.moveHistory
-                            , state = Ready
-                        }
-
-                Nothing ->
-                    game
+                        else
+                            Just
+                                { game
+                                    | table = Move.finalize game.table updatedMove
+                                    , moveHistory = updatedMove :: game.moveHistory
+                                    , state = Ready
+                                }
+                    )
 
         _ ->
-            game
+            Nothing
 
 
 {-| The max function takes the number of empty cascades and then the number of empty cells and returns the maximum number of cards you can move
@@ -677,11 +680,18 @@ endMove mTableLoc move game =
 
                 Nothing ->
                     move
+
+        maybeAppendedMoveHistory =
+            if Move.isNoOp theMove then
+                game.moveHistory
+
+            else
+                theMove :: game.moveHistory
     in
     { game
         | table = Move.finalize game.table theMove
         , state = Ready
-        , moveHistory = theMove :: game.moveHistory
+        , moveHistory = maybeAppendedMoveHistory
     }
 
 
