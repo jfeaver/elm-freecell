@@ -6,7 +6,7 @@ import Expect
 import Game exposing (Msg(..), State(..))
 import Move
 import Move.Autosolve exposing (AutosolveOption(..))
-import Table exposing (CardLoc(..), Table, TableLoc(..))
+import Table exposing (Table, TableLoc(..))
 import Test exposing (..)
 
 
@@ -32,7 +32,7 @@ pickUps =
                     dealAPile t =
                         { t | cascades = Array.set 0 aPickablePile t.cascades }
 
-                    cardLoc =
+                    tableLoc =
                         CascadeLoc 0 0
 
                     newGame =
@@ -54,7 +54,7 @@ pickUps =
                             |> Expect.equal 7
                     , \_ ->
                         -- The largest pile that is pickable should be 5
-                        Game.startMove ( cardLoc, pickedCard ) ( 0, 0 ) game
+                        Game.startMove ( tableLoc, pickedCard ) ( 0, 0 ) game
                             |> .state
                             |> Expect.equal Ready
                     ]
@@ -110,7 +110,7 @@ putDowns =
                         { t | cascades = Array.set 0 [] t.cascades }
 
                     tableLoc =
-                        TableCascade 0 0
+                        CascadeLoc 0 0
 
                     move =
                         Move.new ( pickedFrom, pickedCard ) pickedPile ( 0, 0 )

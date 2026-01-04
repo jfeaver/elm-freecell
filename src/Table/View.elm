@@ -124,9 +124,9 @@ stackOffset depth =
         |> UI.roundToHalf
 
 
-positionFor : Table -> CardLoc -> Position
-positionFor table cardLoc =
-    case cardLoc of
+positionFor : Table -> TableLoc -> Position
+positionFor table tableLoc =
+    case tableLoc of
         CascadeLoc column row ->
             let
                 left =
@@ -136,9 +136,6 @@ positionFor table cardLoc =
                     cascadesTop + toFloat row * stackSpacing
             in
             ( left, top )
-
-        Hand _ ->
-            ( 0, 0 )
 
         CellLoc cell ->
             ( horizontalOffset + toFloat cell * (Card.View.width + padding), topOffset )
@@ -187,7 +184,7 @@ cascadesLocFor table ( left, top ) =
         Nothing
 
     else
-        Just <| TableCascade column row
+        Just <| CascadeLoc column row
 
 
 cellsLocFor : Table -> Position -> Maybe TableLoc
@@ -215,7 +212,7 @@ cellsLocFor table ( left, top ) =
         Nothing
 
     else
-        Just <| TableCell (floor (leftCells / (Card.View.width + padding)))
+        Just <| CellLoc (floor (leftCells / (Card.View.width + padding)))
 
 
 foundationLocFor : Position -> Maybe TableLoc
@@ -243,16 +240,16 @@ foundationLocFor ( left, top ) =
             Card.View.height + padding
     in
     if leftFoundations > 0 && leftFoundations < cardBoxWidth && topFoundations > 0 && topFoundations < maxTop then
-        Just (TableFoundation Diamonds)
+        Just (FoundationLoc Diamonds)
 
     else if leftFoundations > cardBoxWidth && leftFoundations < 2 * cardBoxWidth && topFoundations > 0 && topFoundations < maxTop then
-        Just (TableFoundation Clubs)
+        Just (FoundationLoc Clubs)
 
     else if leftFoundations > 2 * cardBoxWidth && leftFoundations < 3 * cardBoxWidth && topFoundations > 0 && topFoundations < maxTop then
-        Just (TableFoundation Hearts)
+        Just (FoundationLoc Hearts)
 
     else if leftFoundations > 3 * cardBoxWidth && leftFoundations < 4 * cardBoxWidth && topFoundations > 0 && topFoundations < maxTop then
-        Just (TableFoundation Spades)
+        Just (FoundationLoc Spades)
 
     else
         Nothing
@@ -277,11 +274,14 @@ recursiveDeal table row column cascades deck =
         case topCard of
             Just card ->
                 let
-                    cardLoc =
+                    tableLoc =
                         CascadeLoc column row
 
+                    cardLoc =
+                        Static (CascadeLoc column row)
+
                     positionedCard =
-                        { card | position = positionFor table cardLoc, zIndex = zIndexFor cardLoc }
+                        { card | position = positionFor table tableLoc, zIndex = zIndexFor cardLoc }
 
                     cascade =
                         Array.get column cascades |> Maybe.withDefault []
@@ -303,16 +303,16 @@ deal table deck =
 zIndexFor : CardLoc -> Int
 zIndexFor cardLoc =
     case cardLoc of
-        CascadeLoc _ row ->
+        Static (CascadeLoc _ row) ->
             row
 
         Hand depth ->
             150 - depth
 
-        CellLoc _ ->
+        Static (CellLoc _) ->
             1
 
-        FoundationLoc _ ->
+        Static (FoundationLoc _) ->
             -- Top card is two, decrement card is one
             2
 

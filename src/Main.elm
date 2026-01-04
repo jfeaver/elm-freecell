@@ -147,7 +147,7 @@ body model =
                     [ cells game
                     , foundations game
                     , cascades game
-                    , activeMove game game.state
+                    , activeMove game.state
                     ]
                 ]
 
@@ -261,8 +261,8 @@ gameActions game =
         ]
 
 
-cell : Game -> ( Cell, Maybe Card ) -> Html Msg
-cell game ( cellN, maybeCard ) =
+cellView : Game -> ( Cell, Maybe Card ) -> Html Msg
+cellView game ( cellN, maybeCard ) =
     maybeCard
         |> Maybe.map (\card -> cardView game (CellLoc cellN) False card)
         |> Maybe.withDefault
@@ -282,7 +282,7 @@ cells : Game -> Html Msg
 cells game =
     game.table.cells
         |> Array.toIndexedList
-        |> List.map (cell game)
+        |> List.map (cellView game)
         |> div []
 
 
@@ -324,7 +324,7 @@ foundation game fieldGetter suit =
                 ]
 
 
-mouseDownInteraction : ( CardLoc, Card ) -> List (Html.Attribute Msg)
+mouseDownInteraction : ( TableLoc, Card ) -> List (Html.Attribute Msg)
 mouseDownInteraction locatedCard =
     [ onDown (MouseDown locatedCard >> GameMsg) |> fromUnstyled ]
 
@@ -530,32 +530,47 @@ cascadeCardView game columnDepth column pileDepth inversedRow =
     cardView game (CascadeLoc column row) inPile
 
 
-cardView : Game -> CardLoc -> Bool -> Card -> Html Msg
-cardView game cardLoc inPile card =
+cardCss : Float -> Card -> { cardImage : List Css.Style, sizing : List Css.Style, positioning : List Css.Style, all : List Css.Style }
+cardCss inset card =
     let
         cardImage =
-            css
-                [ backgroundImage (url (card |> Card.View.filename))
-                , backgroundSize contain
-                , backgroundRepeat noRepeat
-                ]
+            [ backgroundImage (url (card |> Card.View.filename))
+            , backgroundSize contain
+            , backgroundRepeat noRepeat
+            ]
 
-        sizing inset =
-            css
-                [ width (px (Card.View.width - inset))
-                , height (px (Card.View.height - inset))
-                ]
+        sizing =
+            [ width (px (Card.View.width - inset))
+            , height (px (Card.View.height - inset))
+            ]
 
         positioning =
-            css
-                [ display inlineBlock
-                , position absolute
-                , top
-                    (px (card.position |> Tuple.second))
-                , left (px (card.position |> Tuple.first))
-                , zIndex (int card.zIndex)
-                ]
+            [ display inlineBlock
+            , position absolute
+            , top (px (card.position |> Tuple.second))
+            , left (px (card.position |> Tuple.first))
+            , zIndex (int card.zIndex)
+            ]
+    in
+    { cardImage = cardImage
+    , sizing = sizing
+    , positioning = positioning
+    , all = cardImage ++ sizing ++ positioning
+    }
 
+
+handCardView : Card -> Html Msg
+handCardView card =
+    let
+        styles =
+            cardCss 0 card
+    in
+    div [ css styles.all ] []
+
+
+cardView : Game -> TableLoc -> Bool -> Card -> Html Msg
+cardView game tableLoc inPile card =
+    let
         getStack column row =
             game.table
                 |> Table.stackTo ( column, row )
@@ -579,7 +594,7 @@ cardView game cardLoc inPile card =
                 Just ( focusedCardLoc, _ ) ->
                     case focusedCardLoc of
                         CascadeLoc column row ->
-                            if (cardLoc == focusedCardLoc) && validPile column row then
+                            if (tableLoc == focusedCardLoc) && validPile column row then
                                 css
                                     [ hover [ cursor pointer ]
                                     ]
@@ -596,32 +611,35 @@ cardView game cardLoc inPile card =
                     css []
 
         typicalInteraction =
-            mouseDownInteraction ( cardLoc, card )
-                ++ ([ onMouseEnter (FocusCard ( cardLoc, card ) |> GameMsg)
+            mouseDownInteraction ( tableLoc, card )
+                ++ ([ onMouseEnter (FocusCard ( tableLoc, card ) |> GameMsg)
                     , onMouseLeave (DefocusCard |> GameMsg)
                     ]
                         |> List.map fromUnstyled
                    )
 
         interaction =
-            case cardLoc of
+            case tableLoc of
                 FoundationLoc suit ->
                     foundationInteraction suit (Just card)
 
                 _ ->
                     typicalInteraction
 
+        styles =
+            cardCss 0 card
+
         attrs =
-            List.concat [ interaction, [ cardImage, positioning, sizing 0, hoverOnCard ] ]
+            List.concat [ interaction, [ css styles.all, hoverOnCard ] ]
 
         cardHighlightInset =
             0
 
         cardHighlight =
             div
-                [ positioning
-                , sizing (cardHighlightInset * 2)
-                , onMouseOver (GameMsg (FocusCard ( cardLoc, card ))) |> fromUnstyled
+                [ css styles.positioning
+                , cardCss (cardHighlightInset * 2) card |> .sizing |> css
+                , onMouseOver (GameMsg (FocusCard ( tableLoc, card ))) |> fromUnstyled
                 , css
                     [ margin (px cardHighlightInset)
                     , Css.borderRadius (px (UI.indicatorRadius - cardHighlightInset))
@@ -631,7 +649,7 @@ cardView game cardLoc inPile card =
                 []
 
         isCascade =
-            case cardLoc of
+            case tableLoc of
                 CascadeLoc _ _ ->
                     True
 
@@ -640,11 +658,11 @@ cardView game cardLoc inPile card =
 
         cardShroud =
             div
-                [ positioning
-                , sizing 0
-                , css
-                    [ Css.backgroundColor (Css.rgba 0 0 0 0.17) ]
-                , onMouseEnter (FocusCard ( cardLoc, card ) |> GameMsg) |> fromUnstyled
+                [ css <|
+                    Css.backgroundColor (Css.rgba 0 0 0 0.17)
+                        :: styles.sizing
+                        ++ styles.positioning
+                , onMouseEnter (FocusCard ( tableLoc, card ) |> GameMsg) |> fromUnstyled
                 ]
                 []
 
@@ -658,16 +676,16 @@ cardView game cardLoc inPile card =
 
         isFocused =
             game.focusedCard
-                |> Maybe.map (\( focusedCardLoc, _ ) -> cardLoc == focusedCardLoc)
+                |> Maybe.map (\( focusedCardLoc, _ ) -> focusedCardLoc == tableLoc)
                 |> Maybe.withDefault False
 
         cardIsntAncestorOfFocusedCard =
             game.focusedCard
-                |> Maybe.map (\( focusedCardLoc, focusedCard ) -> Pile.validPile [ focusedCard, card ] && not (isParentOf focusedCardLoc cardLoc))
+                |> Maybe.map (\( focusedTableLoc, focusedCard ) -> Pile.validPile [ focusedCard, card ] && not (isParentOf focusedTableLoc tableLoc))
                 |> Maybe.withDefault False
 
         isNextFoundationalCard suit =
-            Table.getTableCard (TableFoundation suit) game.table
+            Table.getTableCard (FoundationLoc suit) game.table
                 |> Maybe.map (\currentFoundationalCard -> currentFoundationalCard.suit == card.suit && Card.Rank.increment currentFoundationalCard.rank == card.rank)
                 |> Maybe.withDefault (card.suit == suit && card.rank == Ace)
 
@@ -689,18 +707,14 @@ cardView game cardLoc inPile card =
         div [] [ div attrs [], cardShroud ]
 
 
-activeMove : Game -> Game.State -> Html Msg
-activeMove game state =
+activeMove : Game.State -> Html Msg
+activeMove state =
     case state of
         Game.Ready ->
             div [] []
 
         Game.PlayerMove move ->
-            let
-                toCardView depth =
-                    cardView game (Hand depth) False
-
-                cardsHtml =
-                    Move.indexedMap toCardView move
-            in
-            div [] cardsHtml
+            move
+                |> Move.pile
+                |> List.map handCardView
+                |> div []

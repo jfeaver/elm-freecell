@@ -17,7 +17,7 @@ import Browser.Dom exposing (Element)
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color
 import Card.Rank
-import Cascade exposing (Column, Row)
+import Cascade exposing (Column)
 import Deck
 import Html.Events.Extra.Mouse exposing (Event)
 import List.Extra
@@ -26,7 +26,7 @@ import Move exposing (Move)
 import Move.Autosolve exposing (AutosolveOption(..))
 import Position exposing (Position)
 import Process
-import Table exposing (CardLoc(..), Cell, Table, TableLoc(..))
+import Table exposing (Cell, Table, TableLoc(..))
 import Table.View
 import Task
 import Time
@@ -37,7 +37,7 @@ import Time
 type alias MouseDownDetail =
     { time : Time.Posix
     , position : Position
-    , locatedCard : ( CardLoc, Card )
+    , locatedCard : ( TableLoc, Card )
     , mouseUpReceived : Bool
     }
 
@@ -58,7 +58,7 @@ type alias Game =
     , mouseEventProcessLock : MouseEventProcessLock
     , lastMouseDown : Maybe MouseDownDetail
     , doubleClickLast : Bool
-    , focusedCard : Maybe ( CardLoc, Card )
+    , focusedCard : Maybe ( TableLoc, Card )
     , focusedFoundation : Maybe Suit
     , moveHistory : List Move
     , number : Deck.Seed
@@ -68,15 +68,15 @@ type alias Game =
 
 
 type Msg
-    = MouseDown ( CardLoc, Card ) Event
+    = MouseDown ( TableLoc, Card ) Event
     | MouseMove Event
     | MouseUp Event
-    | FocusCard ( CardLoc, Card )
+    | FocusCard ( TableLoc, Card )
     | DefocusCard
     | FocusFoundation Suit (Maybe Card)
     | DefocusFoundation
     | EndMove (Result Browser.Dom.Error ( Element, Event ))
-    | RecordMouseDownTAndP Position ( CardLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
+    | RecordMouseDownTAndP Position ( TableLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
     | Undo
     | Restart
     | Prefer AutosolveOption
@@ -128,16 +128,16 @@ updateFocus tableRelativeMousePosition game =
         -- see if click is a cascade location
         -- check if that cascade location is the last cascade card
         -- focus on that card
-        mNextCardLoc =
+        mNextTableLoc =
             Table.View.locFor game.table tableRelativeMousePosition
 
-        mLocatedTableCard tCardLoc =
+        mLocatedTableCard tableLoc =
             game.table
-                |> Table.getTableCard tCardLoc
-                |> Maybe.map (\card -> ( Table.tableCardLocToCardLoc tCardLoc, card ))
+                |> Table.getTableCard tableLoc
+                |> Maybe.map (\card -> ( tableLoc, card ))
 
         mNextLocatedCard =
-            mNextCardLoc
+            mNextTableLoc
                 |> Maybe.andThen mLocatedTableCard
     in
     case mNextLocatedCard of
@@ -375,15 +375,15 @@ autosolve tableRelativeMousePosition game =
                         |> updateFocus tableRelativeMousePosition
 
 
-startMove : ( CardLoc, Card ) -> Position -> Game -> Game
-startMove ( cardLoc, card ) position game =
+startMove : ( TableLoc, Card ) -> Position -> Game -> Game
+startMove ( tableLoc, card ) position game =
     case game.state of
         Ready ->
             let
                 move pile =
-                    Move.new ( cardLoc, card ) pile position
+                    Move.new ( tableLoc, card ) pile position
             in
-            case pickMovablePile cardLoc game of
+            case pickMovablePile tableLoc game of
                 Just ( pile, table ) ->
                     { game | table = table, state = PlayerMove (move pile) }
 
@@ -406,14 +406,14 @@ updateMouseMove position game =
                             Position.diff mouseDownDetail.position position
                                 |> Position.magnitude
 
-                        cardLoc =
+                        tableLoc =
                             mouseDownDetail.locatedCard |> Tuple.first
 
                         card =
                             mouseDownDetail.locatedCard |> Tuple.second
                     in
                     if not mouseDownDetail.mouseUpReceived && movement > 2 then
-                        startMove ( cardLoc, card ) mouseDownDetail.position game
+                        startMove ( tableLoc, card ) mouseDownDetail.position game
 
                     else
                         game
@@ -557,25 +557,25 @@ maxPileDepth table =
     maxPileDepthAlgorithm maxCascadesPileDepth table
 
 
-pickMovablePile : CardLoc -> Game -> Maybe ( List Card, Table )
-pickMovablePile cardLoc game =
+pickMovablePile : TableLoc -> Game -> Maybe ( List Card, Table )
+pickMovablePile tableLoc game =
     let
         mPileMove ( pile, table ) =
-            maybePileMove cardLoc pile game.table
+            maybePileMove tableLoc pile game.table
 
         withUpdatedTable table pile =
             ( pile, table )
     in
     game.table
-        |> Table.pickPile cardLoc
+        |> Table.pickPile tableLoc
         |> Maybe.andThen (\( pile, table ) -> mPileMove ( pile, table ) |> Maybe.map (withUpdatedTable table))
 
 
-maybePileMove : CardLoc -> List Card -> Table -> Maybe (List Card)
-maybePileMove cardLoc pile table =
+maybePileMove : TableLoc -> List Card -> Table -> Maybe (List Card)
+maybePileMove tableLoc pile table =
     let
         moveMax =
-            case cardLoc of
+            case tableLoc of
                 CascadeLoc _ _ ->
                     maxPileDepth table
 
@@ -686,21 +686,21 @@ endMove mTableLoc move game =
     let
         theMove =
             case mTableLoc of
-                Just (TableCascade column _) ->
+                Just (CascadeLoc column _) ->
                     if validToCascade game.table move column then
                         Move.toCascade column game.table move
 
                     else
                         move
 
-                Just (TableCell cell) ->
+                Just (CellLoc cell) ->
                     if validToCell game.table move cell then
                         Move.toCell cell move
 
                     else
                         move
 
-                Just (TableFoundation suit) ->
+                Just (FoundationLoc suit) ->
                     if validToFoundation game.table move suit then
                         Move.toFoundation suit move
 

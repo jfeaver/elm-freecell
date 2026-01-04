@@ -7,7 +7,7 @@ import Cascade exposing (Column, Row)
 import Game exposing (Game, MouseEventProcessLock(..), Msg(..), State(..))
 import Main exposing (Model(..), Msg(..), update)
 import Move.Autosolve exposing (AutosolveOption(..))
-import Table exposing (CardLoc(..), Table)
+import Table exposing (CardLoc(..), Table, TableLoc(..))
 import Table.View exposing (positionFor, zIndexFor)
 
 
@@ -21,12 +21,15 @@ main =
         }
 
 
+
 -- {-| Use this version of init to play a curated board. -}
 -- init : ( Model, Cmd Main.Msg )
 -- init =
 --     update (GameMsg (Autosolve ( 0, 0 ))) (InGame debugGame)
 
-{-| Use this version of init to play an easier game. -}
+
+{-| Use this version of init to play an easier game.
+-}
 init : ( Model, Cmd Msg )
 init =
     update (SetGame 88738) (MainMenu Nothing)
@@ -35,13 +38,13 @@ init =
 cascadeCard : Table -> Column -> Row -> ( Rank, Suit ) -> Card
 cascadeCard table column row ( rank, suit ) =
     let
-        cardLoc =
+        tableLoc =
             CascadeLoc column row
     in
     { rank = rank
     , suit = suit
-    , position = positionFor table cardLoc
-    , zIndex = zIndexFor cardLoc
+    , position = positionFor table tableLoc
+    , zIndex = zIndexFor (Static tableLoc)
     }
 
 

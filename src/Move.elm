@@ -3,11 +3,11 @@ module Move exposing
     , autosolve
     , color
     , finalize
-    , indexedMap
     , isDestructiveAutoSolveMove
     , isFullCascade
     , isNoOp
     , new
+    , pile
     , pileDepth
     , rank
     , showingSuit
@@ -36,8 +36,8 @@ import Table.View
 
 
 type alias ManualMove =
-    { from : CardLoc
-    , to : CardLoc
+    { from : TableLoc
+    , to : TableLoc
     , pile : Pile
     , topCardStart : Position
     , mouseStart : Position
@@ -49,7 +49,7 @@ type alias ManualMove =
 
 
 type alias AutosolvedMove =
-    { from : CardLoc
+    { from : TableLoc
     , card : Card
     }
 
@@ -59,19 +59,19 @@ type Move
     | Autosolve AutosolvedMove
 
 
-new : ( CardLoc, Card ) -> Pile -> Position -> Move
-new ( cardLoc, topCard ) pile position =
+new : ( TableLoc, Card ) -> Pile -> Position -> Move
+new ( tableLoc, topCard ) cardPile position =
     let
         zIndexInHand depth card =
             { card | zIndex = Table.View.zIndexFor (Hand depth) }
     in
     Manual
-        { from = cardLoc
-        , to = cardLoc
-        , pile = List.indexedMap zIndexInHand pile
+        { from = tableLoc
+        , to = tableLoc
+        , pile = List.indexedMap zIndexInHand cardPile
         , topCardStart = topCard.position
         , mouseStart = position
-        , pileDepth = List.length pile
+        , pileDepth = List.length cardPile
         , rank = topCard.rank
         , showingSuit = topCard.suit
         , color = Card.Color.fromCard topCard
@@ -80,7 +80,7 @@ new ( cardLoc, topCard ) pile position =
 
 isAutosolveable : Table -> AutosolveOption -> Card -> Bool
 isAutosolveable table autosolvePreference card =
-    case Table.getTableCard (TableFoundation card.suit) table of
+    case Table.getTableCard (FoundationLoc card.suit) table of
         Just foundationCard ->
             let
                 incrementsRank =
@@ -194,7 +194,7 @@ isAutosolveable table autosolvePreference card =
             card.rank == Ace
 
 
-getAutosolveableCascade : Table -> AutosolveOption -> Int -> Maybe ( CardLoc, Card )
+getAutosolveableCascade : Table -> AutosolveOption -> Int -> Maybe ( TableLoc, Card )
 getAutosolveableCascade table autosolvePreference cascade =
     let
         cascadeCards =
@@ -210,10 +210,10 @@ getAutosolveableCascade table autosolvePreference cascade =
         |> Maybe.map (\card -> ( CascadeLoc cascade row, card ))
 
 
-autosolve : Table -> AutosolveOption -> Maybe ( Move, CardLoc )
+autosolve : Table -> AutosolveOption -> Maybe ( Move, TableLoc )
 autosolve table autosolvePreference =
     let
-        getAutosolveableCell : Int -> Maybe ( CardLoc, Card )
+        getAutosolveableCell : Int -> Maybe ( TableLoc, Card )
         getAutosolveableCell cell =
             Array.get cell table.cells
                 |> Maybe.withDefault Nothing
@@ -314,14 +314,14 @@ update mousePosition theMove =
             Manual { move | pile = updatedPile }
 
 
-indexedMap : (Int -> Card -> a) -> Move -> List a
-indexedMap fn theMove =
+pile : Move -> Pile
+pile theMove =
     case theMove of
-        Manual { pile } ->
-            List.indexedMap fn pile
+        Manual move ->
+            move.pile
 
         Autosolve { card } ->
-            [ fn 0 card ]
+            [ card ]
 
 
 pileDepth : Move -> Int
@@ -334,11 +334,11 @@ pileDepth theMove =
             1
 
 
-finalizeMoveToFoundation : Suit -> Table -> Card -> CardLoc -> Table
+finalizeMoveToFoundation : Suit -> Table -> Card -> TableLoc -> Table
 finalizeMoveToFoundation suit table card foundationLoc =
     let
         updatedZIndex =
-            Table.View.zIndexFor foundationLoc
+            Table.View.zIndexFor (Static foundationLoc)
 
         updatedPosition =
             Table.View.positionFor table foundationLoc
@@ -373,7 +373,7 @@ finalizeManualMove : Table -> ManualMove -> Table
 finalizeManualMove table move =
     let
         updatedZIndex =
-            Table.View.zIndexFor move.to
+            Table.View.zIndexFor (Static move.to)
 
         updatedPosition =
             Table.View.positionFor table move.to
@@ -409,9 +409,6 @@ finalizeManualMove table move =
                     Array.set column buildColumn table.cascades
             in
             { table | cascades = updatedCascades }
-
-        Hand _ ->
-            table
 
         CellLoc cell ->
             case move.pile of
@@ -510,7 +507,7 @@ rank theMove =
             card.rank
 
 
-to : Move -> CardLoc
+to : Move -> TableLoc
 to theMove =
     case theMove of
         Manual move ->

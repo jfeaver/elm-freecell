@@ -4,6 +4,7 @@ module Table exposing
     , Depth
     , Table
     , TableLoc(..)
+    , callAsTableLocWithDefault
     , cascadeDepth
     , cascadeEmpty
     , cellEmpty
@@ -13,13 +14,13 @@ module Table exposing
     , new
     , pickPile
     , stackTo
-    , tableCardLocToCardLoc
     )
 
 import Array exposing (Array)
 import Card exposing (Card, Suit(..))
 import Card.Rank
 import Cascade exposing (Column, Row)
+import Html exposing (table)
 import List.Extra
 import Maybe.Extra
 import Pile exposing (Pile, validPile)
@@ -50,16 +51,14 @@ type alias Depth =
 
 
 type CardLoc
-    = CascadeLoc Column Row
-    | CellLoc Cell
-    | Hand Depth
-    | FoundationLoc Suit
+    = Hand Depth
+    | Static TableLoc
 
 
 type TableLoc
-    = TableCascade Column Row
-    | TableCell Cell
-    | TableFoundation Suit
+    = CascadeLoc Column Row
+    | CellLoc Cell
+    | FoundationLoc Suit
 
 
 new : Int -> Int -> Table
@@ -103,9 +102,9 @@ cascadeDepth column table =
         |> Maybe.map List.length
 
 
-pickPile : CardLoc -> Table -> Maybe ( Pile, Table )
-pickPile cardLoc table =
-    case cardLoc of
+pickPile : TableLoc -> Table -> Maybe ( Pile, Table )
+pickPile tableLoc table =
+    case tableLoc of
         CascadeLoc column row ->
             let
                 validatePileMapper ( pile, leftBehind ) =
@@ -126,9 +125,6 @@ pickPile cardLoc table =
                     (\( pile, leftBehind ) ->
                         ( pile, { table | cascades = Array.set column leftBehind table.cascades } )
                     )
-
-        Hand _ ->
-            Nothing
 
         CellLoc cell ->
             let
@@ -162,17 +158,14 @@ getCell cell { cells } =
         |> Maybe.Extra.dig
 
 
-tableCardLocToCardLoc : TableLoc -> CardLoc
-tableCardLocToCardLoc tableLoc =
-    case tableLoc of
-        TableCascade column row ->
-            CascadeLoc column row
+callAsTableLocWithDefault : a -> (TableLoc -> a) -> CardLoc -> a
+callAsTableLocWithDefault default fn cardLoc =
+    case cardLoc of
+        Hand _ ->
+            default
 
-        TableCell cell ->
-            CellLoc cell
-
-        TableFoundation foundation ->
-            FoundationLoc foundation
+        Static tableLoc ->
+            fn tableLoc
 
 
 getTableCard : TableLoc -> Table -> Maybe Card
@@ -188,15 +181,15 @@ getTableCard tableLoc table =
                     |> Maybe.andThen (\rest -> getStackCard row rest)
     in
     case tableLoc of
-        TableCascade column row ->
+        CascadeLoc column row ->
             table.cascades
                 |> Array.get column
                 |> Maybe.andThen (getStackCard row)
 
-        TableCell cell ->
+        CellLoc cell ->
             getCell cell table
 
-        TableFoundation foundation ->
+        FoundationLoc foundation ->
             case foundation of
                 Diamonds ->
                     table.diamonds
