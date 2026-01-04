@@ -78,7 +78,7 @@ pickUps =
                         { newTable | cascades = cascades }
 
                     maxPileDepth =
-                        Game.maxPileDepth 0 table
+                        Game.maxPileDepth table
                 in
                 Expect.equal maxPileDepth 3
         ]
@@ -189,7 +189,7 @@ autosolver =
                                )
 
                     updatedGame =
-                        { emptyGame | table = table } |> Game.update Autosolve |> Tuple.first
+                        { emptyGame | table = table } |> Game.update (Autosolve ( 0, 0 )) |> Tuple.first
                 in
                 updatedGame.table.diamonds
                     |> Maybe.map .rank
@@ -239,7 +239,7 @@ autosolver =
                                )
 
                     updatedGame =
-                        { emptyGame | table = table } |> Game.update Autosolve |> Tuple.first
+                        { emptyGame | table = table } |> Game.update (Autosolve ( 0, 0 )) |> Tuple.first
                 in
                 updatedGame.table.diamonds
                     |> Maybe.map .rank

@@ -483,7 +483,7 @@ cascade game cascadesOffset ( column, cards ) =
 
         mPickablePileDepth =
             if focused then
-                Just (Game.maxPileDepth (columnDepth - pileDepth) game.table)
+                Just (Game.maxPileDepth game.table)
 
             else
                 Nothing
@@ -564,14 +564,14 @@ cardView game cardLoc inPile card =
         twoTupleFrom thing =
             ( thing, thing )
 
-        validPileDepth row pile =
-            List.length pile <= Game.maxPileDepth row game.table
+        validPileDepth pile =
+            List.length pile <= Game.maxPileDepth game.table
 
         -- A valid pile is both in order and of a movable depth
         validPile column row =
             getStack column row
                 |> twoTupleFrom
-                |> Tuple.mapBoth Pile.validPile (validPileDepth row)
+                |> Tuple.mapBoth Pile.validPile validPileDepth
                 |> (==) ( True, True )
 
         hoverOnCard =

@@ -1,12 +1,17 @@
+- Does it work on mobile?
+- Toggling off the autosolver is a surprising experience
 - highlight foundation where a hovered card could go
 - Win/Loss conditions and messages
 - hitbox drop collisions (versus point collision right now)
+- foundation highlights could be blue
 - swap location of cells and foundations
 - menu for all my actions
+- instructions (controls and link to game rules)
 - prefer auto moves to cascades that are piles from the very top
 - add a redo
 - 50 images are loaded separately!! Let's embed the SVG directly?
 - CSS animations/animation frames (animate cancelled moves, auto moves, autosolved moves)
 - Error messages (Can't do that because ...)
 - ignore right click
+- convert pile into an opaque type
 - multi-game history

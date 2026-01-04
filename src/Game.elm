@@ -1,6 +1,7 @@
 module Game exposing
     ( Game
     , MouseDownDetail
+    , MouseEventProcessLock(..)
     , Msg(..)
     , State(..)
     , endMove
@@ -24,6 +25,7 @@ import Maybe.Extra
 import Move exposing (Move)
 import Move.Autosolve exposing (AutosolveOption(..))
 import Position exposing (Position)
+import Process
 import Table exposing (CardLoc(..), Cell, Table, TableLoc(..))
 import Table.View
 import Task
@@ -40,6 +42,11 @@ type alias MouseDownDetail =
     }
 
 
+type MouseEventProcessLock
+    = Free
+    | DeterminingMouseDownLocation
+
+
 type State
     = Ready
     | PlayerMove Move
@@ -48,6 +55,7 @@ type State
 type alias Game =
     { table : Table
     , state : State
+    , mouseEventProcessLock : MouseEventProcessLock
     , lastMouseDown : Maybe MouseDownDetail
     , doubleClickLast : Bool
     , focusedCard : Maybe ( CardLoc, Card )
@@ -86,6 +94,7 @@ new deckSeed autosolvePreference =
     in
     { table = Table.View.deal table deck
     , state = Ready
+    , mouseEventProcessLock = Free
     , lastMouseDown = Nothing
     , doubleClickLast = False
     , focusedCard = Nothing
@@ -162,7 +171,7 @@ update msg game =
                         task =
                             Task.map2 (\el time -> ( el, time )) getTableElement Time.now
                     in
-                    ( game, Task.attempt (RecordMouseDownTAndP clientPos locatedCard) task )
+                    ( { game | mouseEventProcessLock = DeterminingMouseDownLocation }, Task.attempt (RecordMouseDownTAndP clientPos locatedCard) task )
 
                 _ ->
                     ( game, Cmd.none )
@@ -171,25 +180,33 @@ update msg game =
             ( updateMouseMove clientPos game, Cmd.none )
 
         MouseUp event ->
-            let
-                getTableElement =
-                    Browser.Dom.getElement "table"
+            case game.mouseEventProcessLock of
+                Free ->
+                    let
+                        getTableElement =
+                            Browser.Dom.getElement "table"
 
-                elementWithEvent el =
-                    ( el, event )
+                        elementWithEvent el =
+                            ( el, event )
 
-                withMouseUp lastMouseDown =
-                    { lastMouseDown | mouseUpReceived = True }
+                        updatedGame =
+                            case game.lastMouseDown of
+                                Just mouseDownDetail ->
+                                    { game | lastMouseDown = Just { mouseDownDetail | mouseUpReceived = True } }
 
-                updatedGame =
-                    case game.lastMouseDown of
-                        Just mouseDownDetail ->
-                            { game | lastMouseDown = Just (withMouseUp mouseDownDetail) }
+                                Nothing ->
+                                    game
+                    in
+                    ( updatedGame, Task.attempt EndMove <| Task.map elementWithEvent getTableElement )
 
-                        Nothing ->
-                            game
-            in
-            ( updatedGame, Task.attempt EndMove <| Task.map elementWithEvent getTableElement )
+                DeterminingMouseDownLocation ->
+                    let
+                        -- Try later
+                        wait =
+                            Process.sleep 0.01
+                                |> Task.perform (\_ -> MouseUp event)
+                    in
+                    ( game, wait )
 
         FocusCard focusedCard ->
             ( { game | focusedCard = Just focusedCard }, Cmd.none )
@@ -223,10 +240,10 @@ update msg game =
                                 mouseUpTablePosition =
                                     Position.diff tablePosition event.clientPos
 
-                                mLastCardLoc =
+                                mLandingLoc =
                                     Table.View.locFor game.table mouseUpTablePosition
                             in
-                            ( endMove mLastCardLoc move game, performMessage (Autosolve mouseUpTablePosition) )
+                            ( endMove mLandingLoc move game, performMessage (Autosolve mouseUpTablePosition) )
 
                 Err _ ->
                     ( game, Cmd.none )
@@ -251,7 +268,7 @@ update msg game =
                     }
 
                 recordMouseDown =
-                    { game | lastMouseDown = Just mouseDownDetail, doubleClickLast = False }
+                    { game | lastMouseDown = Just mouseDownDetail, doubleClickLast = False, mouseEventProcessLock = Free }
             in
             case game.lastMouseDown of
                 Just lastMouseDown ->
@@ -368,7 +385,7 @@ startMove ( cardLoc, card ) position game =
             in
             case pickMovablePile cardLoc game of
                 Just ( pile, table ) ->
-                    { game | table = table, state = PlayerMove <| move pile }
+                    { game | table = table, state = PlayerMove (move pile) }
 
                 Nothing ->
                     game
@@ -526,8 +543,8 @@ maxPileDepthAlgorithm maxFn table =
 
 {-| This is intended to be used as the first argument to `maxPileDepthAlgorithm`. We only ever don't use this algorithm when the player is finalizing a stack move to an empty cascade (See validPileDepthOnMoveToEmptyCascade).
 -}
-maxCascadesPileDepth : Row -> Int -> Int -> Int
-maxCascadesPileDepth row emptyCascades emptyCells =
+maxCascadesPileDepth : Int -> Int -> Int
+maxCascadesPileDepth emptyCascades emptyCells =
     2 ^ emptyCascades * (emptyCells + 1)
 
 
@@ -535,9 +552,9 @@ maxCascadesPileDepth row emptyCascades emptyCells =
 -| cascade that shouldn't be counted) and the table state, this returns the maximum number
 -| of cards in a pile that may be moved at once.
 -}
-maxPileDepth : Row -> Table -> Int
-maxPileDepth row table =
-    maxPileDepthAlgorithm (maxCascadesPileDepth row) table
+maxPileDepth : Table -> Int
+maxPileDepth table =
+    maxPileDepthAlgorithm maxCascadesPileDepth table
 
 
 pickMovablePile : CardLoc -> Game -> Maybe ( List Card, Table )
@@ -559,8 +576,8 @@ maybePileMove cardLoc pile table =
     let
         moveMax =
             case cardLoc of
-                CascadeLoc _ row ->
-                    maxPileDepth row table
+                CascadeLoc _ _ ->
+                    maxPileDepth table
 
                 _ ->
                     1

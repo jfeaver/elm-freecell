@@ -4,7 +4,7 @@ import Array
 import Browser
 import Card exposing (Card, Rank(..), Suit(..))
 import Cascade exposing (Column, Row)
-import Game exposing (Game, Msg(..), State(..))
+import Game exposing (Game, MouseEventProcessLock(..), Msg(..), State(..))
 import Main exposing (Model(..), Msg(..), update)
 import Move.Autosolve exposing (AutosolveOption(..))
 import Table exposing (CardLoc(..), Table)
@@ -21,9 +21,15 @@ main =
         }
 
 
-init : ( Model, Cmd Main.Msg )
+-- {-| Use this version of init to play a curated board. -}
+-- init : ( Model, Cmd Main.Msg )
+-- init =
+--     update (GameMsg (Autosolve ( 0, 0 ))) (InGame debugGame)
+
+{-| Use this version of init to play an easier game. -}
+init : ( Model, Cmd Msg )
 init =
-    update (GameMsg (Autosolve ( 0, 0 ))) (InGame debugGame)
+    update (SetGame 88738) (MainMenu Nothing)
 
 
 cascadeCard : Table -> Column -> Row -> ( Rank, Suit ) -> Card
@@ -59,6 +65,7 @@ debugGame : Game
 debugGame =
     { table = debugTable
     , state = Ready
+    , mouseEventProcessLock = Free
     , lastMouseDown = Nothing
     , doubleClickLast = False
     , focusedCard = Nothing

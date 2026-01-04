@@ -6,3 +6,7 @@ server() {
 debug() {
   server src/ManualTest.elm
 }
+
+build() {
+  elm make src/Main.elm --optimize
+}
