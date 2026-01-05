@@ -2,6 +2,7 @@ module Table exposing
     ( CardLoc(..)
     , Cell
     , Depth
+    , HitboxQuadMap
     , Table
     , TableLoc(..)
     , callAsTableLocWithDefault
@@ -11,6 +12,7 @@ module Table exposing
     , emptyCascades
     , emptyCells
     , getTableCard
+    , maxPileDepthAlgorithm
     , new
     , pickPile
     , stackTo
@@ -20,6 +22,7 @@ import Array exposing (Array)
 import Card exposing (Card, Suit(..))
 import Card.Rank
 import Cascade exposing (Column, Row)
+import Hitbox exposing (Hitbox)
 import Html exposing (table)
 import List.Extra
 import Maybe.Extra
@@ -39,6 +42,15 @@ type alias Table =
     , clubs : Foundation
     , hearts : Foundation
     , spades : Foundation
+    , hitboxes : HitboxQuadMap
+    }
+
+
+type alias HitboxQuadMap =
+    { foundations : List ( Hitbox, TableLoc )
+    , cells : List ( Hitbox, TableLoc )
+    , cascadesHalf : List ( Hitbox, TableLoc )
+    , cascadesOthers : List ( Hitbox, TableLoc )
     }
 
 
@@ -71,6 +83,7 @@ new cellsCount cascadesCount =
     , clubs = Nothing
     , hearts = Nothing
     , spades = Nothing
+    , hitboxes = { foundations = [], cells = [], cascadesHalf = [], cascadesOthers = [] }
     }
 
 
@@ -267,3 +280,10 @@ countEmptyCells cell count table =
 emptyCells : Table -> Int
 emptyCells =
     countEmptyCells 0 0
+
+
+{-| The max function takes the number of empty cascades and then the number of empty cells and returns the maximum number of cards you can move
+-}
+maxPileDepthAlgorithm : (Int -> Int -> Int) -> Table -> Int
+maxPileDepthAlgorithm maxFn table =
+    maxFn (emptyCascades table) (emptyCells table)

@@ -12,11 +12,8 @@ module Game exposing
     , update
     )
 
-import Array
 import Browser.Dom exposing (Element)
 import Card exposing (Card, Rank(..), Suit(..))
-import Card.Color
-import Card.Rank
 import Cascade exposing (Column)
 import Deck
 import Html.Events.Extra.Mouse exposing (Event)
@@ -26,7 +23,7 @@ import Move exposing (Move)
 import Move.Autosolve exposing (AutosolveOption(..))
 import Position exposing (Position)
 import Process
-import Table exposing (Cell, Table, TableLoc(..))
+import Table exposing (Table, TableLoc(..))
 import Table.View
 import Task
 import Time
@@ -75,7 +72,7 @@ type Msg
     | DefocusCard
     | FocusFoundation Suit (Maybe Card)
     | DefocusFoundation
-    | EndMove (Result Browser.Dom.Error ( Element, Event ))
+    | FindMoveDestinationAndFinalize (Result Browser.Dom.Error ( Element, Event ))
     | RecordMouseDownTAndP Position ( TableLoc, Card ) (Result Browser.Dom.Error ( Element, Time.Posix ))
     | Undo
     | Restart
@@ -87,7 +84,7 @@ new : Deck.Seed -> AutosolveOption -> Game
 new deckSeed autosolvePreference =
     let
         table =
-            Table.new 4 8
+            Table.View.newTableWithCachedHitboxes 4 8
 
         deck =
             Deck.fromSeed deckSeed
@@ -197,7 +194,7 @@ update msg game =
                                 Nothing ->
                                     game
                     in
-                    ( updatedGame, Task.attempt EndMove <| Task.map elementWithEvent getTableElement )
+                    ( updatedGame, Task.attempt FindMoveDestinationAndFinalize <| Task.map elementWithEvent getTableElement )
 
                 DeterminingMouseDownLocation ->
                     let
@@ -225,7 +222,7 @@ update msg game =
         DefocusFoundation ->
             ( { game | focusedFoundation = Nothing, focusedCard = Nothing }, Cmd.none )
 
-        EndMove result ->
+        FindMoveDestinationAndFinalize result ->
             case result of
                 Ok ( tableEl, event ) ->
                     case game.state of
@@ -234,14 +231,14 @@ update msg game =
 
                         PlayerMove move ->
                             let
-                                tablePosition =
-                                    ( tableEl.element.x, tableEl.element.y )
+                                mLandingLoc =
+                                    move
+                                        |> Move.hitbox
+                                        |> Table.View.locsForHitbox game.table
+                                        |> Move.pickLoc move game.table
 
                                 mouseUpTablePosition =
-                                    Position.diff tablePosition event.clientPos
-
-                                mLandingLoc =
-                                    Table.View.locFor game.table mouseUpTablePosition
+                                    Position.diff ( tableEl.element.x, tableEl.element.y ) event.clientPos
                             in
                             ( endMove mLandingLoc move game, performMessage (Autosolve mouseUpTablePosition) )
 
@@ -445,7 +442,7 @@ autoMove game =
                         suit =
                             Move.showingSuit move
                     in
-                    if Maybe.Extra.isNothing (Move.startsFromFoundation move) && validToFoundation game.table move suit then
+                    if Maybe.Extra.isNothing (Move.startsFromFoundation move) && Move.validToFoundation game.table move suit then
                         Just (Move.toFoundation suit move)
 
                     else
@@ -470,7 +467,7 @@ autoMove game =
                                 Just ( True, foundColumn )
 
                             Just ( False, foundColumn ) ->
-                                if validToCascade game.table move column then
+                                if Move.validToCascade game.table move column then
                                     if not (Table.cascadeEmpty column game.table) then
                                         -- A new valid cascade is found which is non-empty so prefer it
                                         Just ( True, column )
@@ -485,7 +482,7 @@ autoMove game =
 
                             Nothing ->
                                 -- No previous column is valid but maybe this one is
-                                if validToCascade game.table move column then
+                                if Move.validToCascade game.table move column then
                                     -- A new valid cascade is found add True as the first Tuple term if the cascade is non-empty
                                     Just ( not (Table.cascadeEmpty column game.table), column )
 
@@ -501,7 +498,7 @@ autoMove game =
                         |> Maybe.map (\( _, column ) -> Move.toCascade column game.table move)
 
                 maybeFreeCell _ =
-                    List.Extra.find (validToCell game.table move) tableCellsIndices
+                    List.Extra.find (Move.validToCell game.table move) tableCellsIndices
 
                 moveToCell _ =
                     -- if moving a single card and an open cell exists then move to cell
@@ -527,20 +524,6 @@ autoMove game =
             Nothing
 
 
-{-| The max function takes the number of empty cascades and then the number of empty cells and returns the maximum number of cards you can move
--}
-maxPileDepthAlgorithm : (Int -> Int -> Int) -> Table -> Int
-maxPileDepthAlgorithm maxFn table =
-    let
-        emptyCascades =
-            Table.emptyCascades table
-
-        emptyCells =
-            Table.emptyCells table
-    in
-    maxFn emptyCascades emptyCells
-
-
 {-| This is intended to be used as the first argument to `maxPileDepthAlgorithm`. We only ever don't use this algorithm when the player is finalizing a stack move to an empty cascade (See validPileDepthOnMoveToEmptyCascade).
 -}
 maxCascadesPileDepth : Int -> Int -> Int
@@ -554,7 +537,7 @@ maxCascadesPileDepth emptyCascades emptyCells =
 -}
 maxPileDepth : Table -> Int
 maxPileDepth table =
-    maxPileDepthAlgorithm maxCascadesPileDepth table
+    Table.maxPileDepthAlgorithm maxCascadesPileDepth table
 
 
 pickMovablePile : TableLoc -> Game -> Maybe ( List Card, Table )
@@ -589,123 +572,23 @@ maybePileMove tableLoc pile table =
         Nothing
 
 
-{-| While moving to an empty cascade you can't consider it to be
-empty as an intermediate pile stacking zone. Additionally, if a
-full cascade is being moved then that can't count as an empty
-cascade either.
+{-| This is exposed (for tests) but maybe it shouldn't be??
+This function assumes that the provided table location has already been validated by functions in Move
+so it blindly sets the move destination to that location.
 -}
-validPileDepthOnMoveToEmptyCascade : Table -> Move -> Bool
-validPileDepthOnMoveToEmptyCascade table move =
-    let
-        maxCardsToMove emptyCascades emptyCells =
-            if Move.isFullCascade move then
-                2 ^ (emptyCascades - 2) * (emptyCells + 1)
-
-            else
-                2 ^ (emptyCascades - 1) * (emptyCells + 1)
-    in
-    Move.pileDepth move <= maxPileDepthAlgorithm maxCardsToMove table
-
-
-{-| For moving onto cascades
--}
-validDecrement : Move -> Card -> Bool
-validDecrement move card =
-    Card.Rank.increment (Move.rank move) == card.rank
-
-
-{-| For moving onto foundations
--}
-validIncrement : Move -> Card -> Bool
-validIncrement move card =
-    Move.rank move == Card.Rank.increment card.rank
-
-
-validToCascade : Table -> Move -> Column -> Bool
-validToCascade table move column =
-    let
-        cascade =
-            table.cascades
-                |> Array.get column
-                |> Maybe.withDefault []
-
-        moveColor =
-            Move.color move
-
-        mCascadeCard =
-            case cascade of
-                head :: _ ->
-                    Just head
-
-                _ ->
-                    Nothing
-    in
-    case mCascadeCard of
-        Just cascadeCard ->
-            (Card.Color.notColor moveColor == Card.Color.fromCard cascadeCard) && validDecrement move cascadeCard
-
-        Nothing ->
-            validPileDepthOnMoveToEmptyCascade table move
-
-
-validToCell : Table -> Move -> Cell -> Bool
-validToCell table move cell =
-    Table.cellEmpty cell table && Move.pileDepth move == 1
-
-
-validToFoundation : Table -> Move -> Suit -> Bool
-validToFoundation table move suit =
-    let
-        foundationCard =
-            case suit of
-                Diamonds ->
-                    table.diamonds
-
-                Clubs ->
-                    table.clubs
-
-                Hearts ->
-                    table.hearts
-
-                Spades ->
-                    table.spades
-
-        isIncrement =
-            case foundationCard of
-                Just card ->
-                    validIncrement move card
-
-                Nothing ->
-                    Move.rank move == Ace
-    in
-    Move.pileDepth move == 1 && Move.showingSuit move == suit && isIncrement
-
-
 endMove : Maybe TableLoc -> Move -> Game -> Game
 endMove mTableLoc move game =
     let
         theMove =
             case mTableLoc of
                 Just (CascadeLoc column _) ->
-                    if validToCascade game.table move column then
-                        Move.toCascade column game.table move
-
-                    else
-                        move
+                    Move.toCascade column game.table move
 
                 Just (CellLoc cell) ->
-                    if validToCell game.table move cell then
-                        Move.toCell cell move
-
-                    else
-                        move
+                    Move.toCell cell move
 
                 Just (FoundationLoc suit) ->
-                    if validToFoundation game.table move suit then
-                        Move.toFoundation suit move
-
-                    else
-                        move
+                    Move.toFoundation suit move
 
                 Nothing ->
                     move

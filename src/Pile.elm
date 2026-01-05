@@ -1,9 +1,16 @@
-module Pile exposing (Pile, fromCascade, validPile)
+module Pile exposing
+    ( Pile
+    , fromCascade
+    , hitbox
+    , validPile
+    )
 
 import Card exposing (Card)
 import Card.Color
 import Card.Rank
+import Card.View
 import Cascade exposing (Row)
+import Hitbox exposing (Hitbox)
 
 
 {-| A "pile" is a correctly ordered stack of cards (red/black alternating and descending in rank from back to front).
@@ -60,3 +67,36 @@ pileFinder row remaining pile_ =
 fromCascade : List Card -> ( Row, Pile )
 fromCascade cards =
     pileFinder (List.length cards - 1) cards []
+
+
+hitbox_ : Pile -> Maybe Card -> Hitbox
+hitbox_ pile mFirstCard =
+    case mFirstCard of
+        Just firstCard ->
+            case pile of
+                card :: others ->
+                    if List.length others == 0 then
+                        ( Tuple.first (Card.View.hitbox card)
+                        , Tuple.second (Card.View.hitbox firstCard)
+                        )
+
+                    else
+                        hitbox_ others mFirstCard
+
+                [] ->
+                    -- Pile is a single card
+                    Card.View.hitbox firstCard
+
+        Nothing ->
+            case pile of
+                firstCard :: others ->
+                    hitbox_ others (Just firstCard)
+
+                [] ->
+                    -- Pile contains no cards (doesn't happen)
+                    ( ( 0, 0 ), ( 0, 0 ) )
+
+
+hitbox : Pile -> Hitbox
+hitbox pile =
+    hitbox_ pile Nothing

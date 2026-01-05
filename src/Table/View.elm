@@ -8,6 +8,8 @@ module Table.View exposing
     , height
     , horizontalOffset
     , locFor
+    , locsForHitbox
+    , newTableWithCachedHitboxes
     , padding
     , positionFor
     , stackOffset
@@ -22,14 +24,22 @@ import Basics.Extra exposing (divMod)
 import Card exposing (Card, Suit(..))
 import Card.View
 import Cascade exposing (Column, Row)
+import Collision
 import Css exposing (border3, borderRadius, hex, px, solid)
 import Deck exposing (Deck)
+import Hitbox exposing (Hitbox)
 import Html.Styled exposing (Attribute)
 import Html.Styled.Attributes exposing (css)
 import Maybe.Extra
 import Position exposing (Position)
 import Table exposing (CardLoc(..), Depth, Table, TableLoc(..))
 import UI
+
+
+newTableWithCachedHitboxes : Int -> Int -> Table
+newTableWithCachedHitboxes cellsCount cascadesCount =
+    Table.new cellsCount cascadesCount
+        |> (\t -> { t | hitboxes = newHitboxQuadMap t })
 
 
 width : Float
@@ -259,6 +269,144 @@ locFor : Table -> Position -> Maybe TableLoc
 locFor table tablePosition =
     Maybe.Extra.or (cascadesLocFor table tablePosition) (cellsLocFor table tablePosition)
         |> Maybe.Extra.or (foundationLocFor tablePosition)
+
+
+newHitboxQuadMap : Table -> Table.HitboxQuadMap
+newHitboxQuadMap table =
+    let
+        getPos =
+            positionFor table
+
+        singleCardHitbox position =
+            Hitbox.fromDelta position ( Card.View.width, Card.View.height )
+
+        foundationHitboxes =
+            [ FoundationLoc Diamonds, FoundationLoc Clubs, FoundationLoc Hearts, FoundationLoc Spades ]
+                |> List.map (\tableLoc -> ( getPos tableLoc |> singleCardHitbox, tableLoc ))
+
+        cellsHitboxes =
+            table.cellsCount
+                - 1
+                |> List.range 0
+                |> List.map (CellLoc >> (\tableLoc -> ( getPos tableLoc |> singleCardHitbox, tableLoc )))
+
+        cascadeHitboxHeight =
+            stackOffset 20 + Card.View.height
+
+        cascadeHitbox column =
+            let
+                loc =
+                    CascadeLoc column 0
+
+                top =
+                    getPos loc
+            in
+            ( Hitbox.fromDelta top ( Card.View.width, cascadeHitboxHeight ), loc )
+
+        halfCount =
+            toFloat table.cascadesCount / 2 |> floor
+
+        cascadesHalf =
+            halfCount
+                |> List.range 0
+                |> List.map cascadeHitbox
+
+        cascadesOthers =
+            -- The other half with an overlap of one
+            table.cascadesCount
+                - 1
+                |> List.range (halfCount - 1)
+                |> List.map cascadeHitbox
+    in
+    { foundations = foundationHitboxes
+    , cells = cellsHitboxes
+    , cascadesHalf = cascadesHalf
+    , cascadesOthers = cascadesOthers
+    }
+
+
+type alias HitboxesGetter =
+    Table.HitboxQuadMap -> List ( Hitbox, TableLoc )
+
+
+hitboxesToCheck : Table -> Hitbox -> List HitboxesGetter
+hitboxesToCheck table ( ( x1, y1 ), ( x2, y2 ) ) =
+    let
+        ( foundationX, foundationY ) =
+            positionFor table (FoundationLoc Diamonds)
+
+        checkFoundations =
+            if x2 >= foundationX && y1 <= foundationY + Card.View.height then
+                Just .foundations
+
+            else
+                Nothing
+
+        ( cellsX, cellsY ) =
+            positionFor table (CellLoc (table.cellsCount - 1))
+
+        checkCells =
+            if x1 <= cellsX + Card.View.width && y1 <= cellsY + Card.View.height then
+                Just .cells
+
+            else
+                Nothing
+
+        halfCount =
+            toFloat table.cascadesCount / 2 |> floor
+
+        ( cascadesHalfX, cascadesHalfY ) =
+            positionFor table (CascadeLoc (halfCount - 1) 0)
+
+        checkCascadesHalf =
+            if x1 <= cascadesHalfX && y2 >= cascadesHalfY then
+                Just .cascadesHalf
+
+            else
+                Nothing
+
+        checkCascadesOthers =
+            if x1 > cascadesHalfX && y2 >= cascadesHalfY then
+                Just .cascadesOthers
+
+            else
+                Nothing
+
+        all =
+            [ checkFoundations, checkCells, checkCascadesHalf, checkCascadesOthers ]
+
+        foldFn : Maybe HitboxesGetter -> List HitboxesGetter -> List HitboxesGetter
+        foldFn mGetter soFar =
+            case mGetter of
+                Just getter ->
+                    getter :: soFar
+
+                Nothing ->
+                    soFar
+    in
+    List.foldl foldFn [] all
+
+
+locsForHitbox : Table -> Hitbox -> List TableLoc
+locsForHitbox table incomingHitbox =
+    let
+        possibleCollisions =
+            incomingHitbox
+                |> hitboxesToCheck table
+                |> List.foldl (\getter hitboxes -> getter table.hitboxes ++ hitboxes) []
+
+        isCollision =
+            Collision.between incomingHitbox
+
+        collisionFolder collider collisions =
+            if isCollision (collider |> Tuple.first) then
+                (collider |> Tuple.second) :: collisions
+
+            else
+                collisions
+    in
+    possibleCollisions
+        |> List.foldl collisionFolder []
 
 
 recursiveDeal : Table -> Row -> Column -> Array (List Card) -> Deck -> Array (List Card)

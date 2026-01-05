@@ -1,8 +1,7 @@
 - Does it work on mobile?
-- Toggling off the autosolver is a surprising experience
+- The way the autosolver is toggled off during undo is a surprising experience
 - highlight foundation where a hovered card could go
-- Win/Loss conditions and messages
-- hitbox drop collisions (versus point collision right now)
+- Win condition and messages
 - foundation highlights could be blue
 - swap location of cells and foundations
 - menu for all my actions
@@ -15,3 +14,4 @@
 - ignore right click
 - convert pile into an opaque type
 - multi-game history
+- loss condition and message?

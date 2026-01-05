@@ -3,10 +3,12 @@ module Move exposing
     , autosolve
     , color
     , finalize
+    , hitbox
     , isDestructiveAutoSolveMove
     , isFullCascade
     , isNoOp
     , new
+    , pickLoc
     , pile
     , pileDepth
     , rank
@@ -19,6 +21,9 @@ module Move exposing
     , toFoundation
     , undo
     , update
+    , validToCascade
+    , validToCell
+    , validToFoundation
     , wasAutosolved
     )
 
@@ -26,7 +31,9 @@ import Array
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.Color exposing (CardColor(..))
 import Card.Rank
+import Card.View
 import Cascade exposing (Column)
+import Hitbox exposing (Hitbox)
 import Maybe.Extra
 import Move.Autosolve exposing (AutosolveOption(..))
 import Pile exposing (Pile)
@@ -588,3 +595,165 @@ isNoOp theMove =
 
         Autosolve _ ->
             False
+
+
+hitbox : Move -> Hitbox
+hitbox theMove =
+    case theMove of
+        Manual move ->
+            Pile.hitbox move.pile
+
+        Autosolve autosolvedMove ->
+            Card.View.hitbox autosolvedMove.card
+
+
+{-| While moving to an empty cascade you can't consider it to be
+empty as an intermediate pile stacking zone. Additionally, if a
+full cascade is being moved then that can't count as an empty
+cascade either.
+-}
+validPileDepthOnMoveToEmptyCascade : Table -> Move -> Bool
+validPileDepthOnMoveToEmptyCascade table move =
+    let
+        maxCardsToMove emptyCascades emptyCells =
+            if isFullCascade move then
+                2 ^ (emptyCascades - 2) * (emptyCells + 1)
+
+            else
+                2 ^ (emptyCascades - 1) * (emptyCells + 1)
+    in
+    pileDepth move <= Table.maxPileDepthAlgorithm maxCardsToMove table
+
+
+{-| For moving onto cascades
+-}
+validDecrement : Move -> Card -> Bool
+validDecrement move card =
+    Card.Rank.increment (rank move) == card.rank
+
+
+{-| For moving onto foundations
+-}
+validIncrement : Move -> Card -> Bool
+validIncrement move card =
+    rank move == Card.Rank.increment card.rank
+
+
+validToCascade : Table -> Move -> Column -> Bool
+validToCascade table move column =
+    let
+        cascade =
+            table.cascades
+                |> Array.get column
+                |> Maybe.withDefault []
+
+        moveColor =
+            color move
+
+        mCascadeCard =
+            case cascade of
+                head :: _ ->
+                    Just head
+
+                _ ->
+                    Nothing
+    in
+    case mCascadeCard of
+        Just cascadeCard ->
+            (Card.Color.notColor moveColor == Card.Color.fromCard cascadeCard) && validDecrement move cascadeCard
+
+        Nothing ->
+            validPileDepthOnMoveToEmptyCascade table move
+
+
+validToCell : Table -> Move -> Cell -> Bool
+validToCell table move cell =
+    Table.cellEmpty cell table && pileDepth move == 1
+
+
+validToFoundation : Table -> Move -> Suit -> Bool
+validToFoundation table move suit =
+    let
+        foundationCard =
+            case suit of
+                Diamonds ->
+                    table.diamonds
+
+                Clubs ->
+                    table.clubs
+
+                Hearts ->
+                    table.hearts
+
+                Spades ->
+                    table.spades
+
+        isIncrement =
+            case foundationCard of
+                Just card ->
+                    validIncrement move card
+
+                Nothing ->
+                    rank move == Ace
+    in
+    pileDepth move == 1 && showingSuit move == suit && isIncrement
+
+
+{-| Given a list of table locations that might be the intended move target, pick one that is valid and most ideal.
+-}
+pickLoc : Move -> Table -> List TableLoc -> Maybe TableLoc
+pickLoc move table locs =
+    let
+        considerOnlyValidLocs loc validLocs =
+            case loc of
+                FoundationLoc suit ->
+                    if validToFoundation table move suit then
+                        loc :: validLocs
+
+                    else
+                        validLocs
+
+                CascadeLoc column _ ->
+                    if validToCascade table move column then
+                        loc :: validLocs
+
+                    else
+                        validLocs
+
+                CellLoc cell ->
+                    if validToCell table move cell then
+                        loc :: validLocs
+
+                    else
+                        validLocs
+
+        pickBestLoc loc mLoc =
+            case loc of
+                FoundationLoc _ ->
+                    Just loc
+
+                CascadeLoc _ _ ->
+                    case mLoc of
+                        Just (FoundationLoc _) ->
+                            mLoc
+
+                        _ ->
+                            Just loc
+
+                CellLoc _ ->
+                    case mLoc of
+                        Just (FoundationLoc _) ->
+                            mLoc
+
+                        Just (CascadeLoc _ _) ->
+                            mLoc
+
+                        Nothing ->
+                            Just loc
+
+                        _ ->
+                            mLoc
+    in
+    locs
+        |> List.foldl considerOnlyValidLocs []
+        |> List.foldl pickBestLoc Nothing

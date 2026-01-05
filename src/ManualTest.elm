@@ -52,7 +52,7 @@ debugTable : Table
 debugTable =
     let
         table =
-            Table.new 2 2
+            Table.View.newTableWithCachedHitboxes 2 2
 
         cascade1 =
             [ ( King, Spades ), ( Two, Hearts ), ( Queen, Hearts ), ( Jack, Spades ), ( Ace, Spades ), ( Ten, Hearts ) ]

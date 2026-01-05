@@ -1,6 +1,7 @@
 module Card.View exposing (..)
 
 import Card exposing (Card, Rank(..), Suit(..))
+import Hitbox exposing (Hitbox)
 import UI
 
 
@@ -98,3 +99,8 @@ short of that height by about 0.3 pixels
 shortBy : Float
 shortBy =
     0.3 |> UI.zoomed
+
+
+hitbox : Card -> Hitbox
+hitbox { position } =
+    Hitbox.fromDelta position ( width, height )
