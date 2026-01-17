@@ -1,12 +1,15 @@
 module Main exposing (..)
 
-import Array
+import Array exposing (Array)
 import Browser exposing (Document)
+import Browser.Events
 import Card exposing (Card, Rank(..), Suit(..))
 import Card.Rank
 import Card.View
-import Cascade exposing (Column, Row)
-import Css exposing (absolute, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, borderRadius, contain, cursor, display, height, hex, hover, inline, inlineBlock, int, left, margin, maxWidth, noRepeat, padding, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
+import Cascade exposing (Row)
+import Css exposing (absolute, animationDuration, animationName, auto, backgroundColor, backgroundImage, backgroundRepeat, backgroundSize, batch, borderRadius, contain, cursor, display, height, hex, hover, inline, inlineBlock, int, left, margin, maxWidth, noRepeat, padding, pct, pointer, position, px, relative, right, top, transform, translate2, url, width, zIndex)
+import Css.Animations exposing (keyframes, property)
+import Css.Transitions exposing (cubicBezier, transition)
 import Deck
 import Game exposing (Game, Msg(..), State(..))
 import Html.Events exposing (onMouseEnter, onMouseLeave, onMouseOver)
@@ -14,12 +17,15 @@ import Html.Events.Extra.Mouse exposing (onDown, onMove, onUp)
 import Html.Styled as Html exposing (Html, button, div, h3, input, label, text)
 import Html.Styled.Attributes as HA exposing (checked, css, disabled, for, fromUnstyled, id, name, type_)
 import Html.Styled.Events exposing (onClick, onInput)
+import Html.Styled.Keyed
+import Html.Styled.Lazy exposing (lazy)
 import Modal
 import Move
 import Move.Autosolve exposing (AutosolveOption(..))
 import Pile
+import Position
 import Random
-import Table exposing (CardLoc(..), Cell, Table, TableLoc(..))
+import Table exposing (AnimationState(..), CardLoc(..), InGameCard, TableLoc(..))
 import Table.View
 import UI
 
@@ -30,7 +36,7 @@ main =
         { init = always init
         , view = view
         , update = update
-        , subscriptions = always Sub.none
+        , subscriptions = subscriptions
         }
 
 
@@ -58,15 +64,38 @@ init =
     ( MainMenu Nothing, startGame )
 
 
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    case model of
+        MainMenu _ ->
+            Sub.none
+
+        InGame game ->
+            case game.table.animation of
+                AnimationPending ->
+                    Browser.Events.onAnimationFrame (\posix -> GameMsg (AnimateCards posix))
+
+                _ ->
+                    Sub.none
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         SetGame deckSeed ->
             let
+                autosolvePreference =
+                    case model of
+                        InGame g ->
+                            g.autosolvePreference
+
+                        _ ->
+                            NonSupporting
+
                 game =
-                    Game.new deckSeed NonSupporting
+                    Game.new deckSeed autosolvePreference
             in
-            update (GameMsg (Autosolve ( 0, 0 ))) (InGame game)
+            update (GameMsg (Autosolve ( 0, 0 ) True)) (InGame game)
 
         NewGame ->
             ( model, startGame )
@@ -129,9 +158,12 @@ body model =
                         |> Maybe.map selectGame
                         |> Maybe.map (\aDiv -> [ aDiv ])
                         |> Maybe.withDefault []
+
+                cascadesPileRows =
+                    game.table.cascades |> Array.map Pile.cascadeRow
             in
             List.append selectModal
-                [ gameActions game
+                [ lazy gameActions { autosolvePreference = game.autosolvePreference, gameNumber = game.number }
                 , div
                     [ css
                         [ backgroundColor (hex Table.View.backgroundHex)
@@ -144,10 +176,10 @@ body model =
                     , onUp (MouseUp >> GameMsg) |> fromUnstyled
                     , id "table"
                     ]
-                    [ cells game
-                    , foundations game
-                    , cascades game
-                    , activeMove game.state
+                    [ lazy cellMarks game.table.cellsCount
+                    , foundationMarks
+                    , lazy cascadeMarks game.table.cascadesCount
+                    , Html.Styled.Keyed.node "div" [] (keyedCardsView game cascadesPileRows)
                     ]
                 ]
 
@@ -236,71 +268,67 @@ selectGame { mParseResult, input } =
         ]
 
 
-autosolveOptions : Game -> Html Msg
-autosolveOptions game =
+autosolveOptions : AutosolveOption -> Html Msg
+autosolveOptions autosolvePreference =
     div [ css [ display inline ] ]
         [ text "Auto-solver?"
         , label [ for "NoAutosolve", onClick (GameMsg (Prefer NoAutosolve)) ] [ text "Off" ]
-        , input [ id "NoAutosolve", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer NoAutosolve)), checked (game.autosolvePreference == NoAutosolve) ] [ text "None" ]
+        , input [ id "NoAutosolve", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer NoAutosolve)), checked (autosolvePreference == NoAutosolve) ] [ text "None" ]
         , label [ for "NonSupporting", onClick (GameMsg (Prefer NonSupporting)) ] [ text "Non-Supporting" ]
-        , input [ id "NonDependent", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer NonSupporting)), checked (game.autosolvePreference == NonSupporting) ] [ text "Non-Dependent" ]
+        , input [ id "NonDependent", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer NonSupporting)), checked (autosolvePreference == NonSupporting) ] [ text "Non-Dependent" ]
         , label [ for "AllAutosolve", onClick (GameMsg (Prefer AlwaysAutosolve)) ] [ text "Always" ]
-        , input [ id "AllAutosolve", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer AlwaysAutosolve)), checked (game.autosolvePreference == AlwaysAutosolve) ] [ text "All" ]
+        , input [ id "AllAutosolve", name "autosolvePreference", type_ "radio", onClick (GameMsg (Prefer AlwaysAutosolve)), checked (autosolvePreference == AlwaysAutosolve) ] [ text "All" ]
         ]
 
 
-gameActions : Game -> Html Msg
-gameActions game =
+gameActions : { gameNumber : Deck.Seed, autosolvePreference : AutosolveOption } -> Html Msg
+gameActions { gameNumber, autosolvePreference } =
     div []
         [ button [ onClick NewGame, css [ cursor pointer ] ] [ text "New Game" ]
         , button [ onClick (GameMsg Game.Restart), css [ cursor pointer ] ] [ text "Restart" ]
         , button [ onClick (GameMsg Game.Undo), css [ cursor pointer ] ] [ text "Undo" ]
         , button [ onClick SelectGame, css [ cursor pointer ] ] [ text "Select Game" ]
-        , text ("Playing game number " ++ String.fromInt game.number)
-        , autosolveOptions game
+        , text ("Playing game number " ++ String.fromInt gameNumber)
+        , autosolveOptions autosolvePreference
         ]
 
 
-cellView : Game -> ( Cell, Maybe Card ) -> Html Msg
-cellView game ( cellN, maybeCard ) =
-    maybeCard
-        |> Maybe.map (\card -> cardView game (CellLoc cellN) False card)
-        |> Maybe.withDefault
-            (div
+cellMarks : Int -> Html Msg
+cellMarks cellsCount =
+    let
+        cellMark cell =
+            div
                 [ Table.View.cardMark
                 , css
                     [ position absolute
                     , top (px Table.View.topOffset)
-                    , left (px (Table.View.horizontalOffset + (Card.View.width + Table.View.padding) * toFloat cellN))
+                    , left (px (Table.View.horizontalOffset + (Card.View.width + Table.View.padding) * toFloat cell))
                     ]
                 ]
                 []
-            )
-
-
-cells : Game -> Html Msg
-cells game =
-    game.table.cells
-        |> Array.toIndexedList
-        |> List.map (cellView game)
+    in
+    cellsCount
+        - 1
+        |> List.range 0
+        |> List.map cellMark
         |> div []
 
 
-foundation : Game -> (Table -> Maybe Card) -> Suit -> Html Msg
-foundation game fieldGetter suit =
+foundationMarks : Html Msg
+foundationMarks =
     let
-        suitIconWidth =
-            0.53 * Card.View.width
-
-        suitIconHeight =
-            Card.View.aspectRatio * suitIconWidth
-
         positioning n =
             css
                 [ position absolute
                 , top (px Table.View.topOffset)
                 , right (px (Table.View.horizontalOffset + (Card.View.width + Table.View.padding) * toFloat n))
                 ]
+
+        suitIconWidth =
+            0.53 * Card.View.width
+
+        suitIconHeight =
+            Card.View.aspectRatio * suitIconWidth
 
         cardIcon filepath =
             css
@@ -313,15 +341,66 @@ foundation game fieldGetter suit =
                 , left (pct 50)
                 , transform (translate2 (pct -50) (pct 50))
                 ]
-    in
-    case fieldGetter game.table of
-        Just card ->
-            cardView game (FoundationLoc suit) False card
 
-        Nothing ->
+        foundationMark suit =
             div ([ Table.View.cardMark, positioning (3 - Card.suitIndex suit) ] ++ foundationInteraction suit Nothing)
                 [ div [ cardIcon (Card.View.suitIconSrc suit) ] []
                 ]
+    in
+    div []
+        [ foundationMark Diamonds
+        , foundationMark Clubs
+        , foundationMark Hearts
+        , foundationMark Spades
+        ]
+
+
+cascadeMarks : Int -> Html Msg
+cascadeMarks cascadesCount =
+    let
+        cascadeOffset column =
+            Table.View.cascadesMargin cascadesCount + toFloat column * (Card.View.width + Table.View.padding)
+
+        cardMark column =
+            div
+                [ css
+                    [ position absolute
+                    , top (px Table.View.cascadesTop)
+                    , left (px (cascadeOffset column))
+                    ]
+                , Table.View.cardMark
+                ]
+                []
+    in
+    cascadesCount
+        - 1
+        |> List.range 0
+        |> List.map cardMark
+        |> div []
+
+
+keyedCardsView : Game -> Array Row -> List ( String, Html Msg )
+keyedCardsView game cascadesPileRows =
+    let
+        tableCards =
+            Table.inGameCards game.table cascadesPileRows
+
+        handCards =
+            case game.state of
+                PlayerMove move ->
+                    Move.pile move
+                        |> List.indexedMap (\i c -> { card = c, cardLoc = Hand i, inPile = True })
+
+                _ ->
+                    []
+    in
+    (tableCards ++ handCards)
+        |> List.map (keyedCardView game)
+
+
+keyedCardView : Game -> InGameCard -> ( String, Html Msg )
+keyedCardView game { cardLoc, card, inPile } =
+    ( Card.id card, cardView game cardLoc inPile card )
 
 
 mouseDownInteraction : ( TableLoc, Card ) -> List (Html.Attribute Msg)
@@ -346,16 +425,6 @@ foundationInteraction suit mCard =
             ]
                 |> List.map fromUnstyled
            )
-
-
-foundations : Game -> Html Msg
-foundations game =
-    div []
-        [ foundation game .diamonds Diamonds
-        , foundation game .clubs Clubs
-        , foundation game .hearts Hearts
-        , foundation game .spades Spades
-        ]
 
 
 type alias PileIndicatorDetails =
@@ -437,99 +506,6 @@ splitPileIndicator pickablePileDepth details =
     List.append (unifiedPileIndicator details (Just inactiveColor)) (unifiedPileIndicator activePileDetails (Just activeColor))
 
 
-cascade : Game -> Float -> ( Column, List Card ) -> Html Msg
-cascade game cascadesOffset ( column, cards ) =
-    let
-        ( rowStart, pile ) =
-            Pile.fromCascade cards
-
-        pileDepth =
-            List.length pile
-
-        columnDepth =
-            List.length cards
-
-        cascadeOffset =
-            cascadesOffset + toFloat column * (Card.View.width + Table.View.padding)
-
-        pileIndicatorTop =
-            rowStart
-                |> toFloat
-                |> (*) Table.View.stackSpacing
-                |> (+) Table.View.cascadesTop
-
-        cardMark =
-            div
-                [ css
-                    [ position absolute
-                    , top (px Table.View.cascadesTop)
-                    , left (px cascadeOffset)
-                    ]
-                , Table.View.cardMark
-                ]
-                []
-
-        focused =
-            Game.focusedPile column pileDepth columnDepth game
-
-        pileIndicatorDetails : PileIndicatorDetails
-        pileIndicatorDetails =
-            { pileDepth = pileDepth
-            , rowStart = rowStart
-            , indicatorTop = pileIndicatorTop
-            , cascadeOffset = cascadeOffset
-            , focused = focused
-            }
-
-        mPickablePileDepth =
-            if focused then
-                Just (Game.maxPileDepth game.table)
-
-            else
-                Nothing
-
-        mPileIndicator =
-            if pileDepth > 1 then
-                Just (pileIndicator pileIndicatorDetails mPickablePileDepth)
-
-            else
-                Nothing
-
-        basicIndicators =
-            [ cardMark ]
-
-        indicators =
-            mPileIndicator
-                |> Maybe.withDefault []
-                |> List.append basicIndicators
-    in
-    div [] <|
-        List.concat
-            [ indicators
-            , List.indexedMap (cascadeCardView game columnDepth column pileDepth) cards
-            ]
-
-
-cascades : Game -> Html Msg
-cascades game =
-    game.table.cascades
-        |> Array.toIndexedList
-        |> List.map (cascade game <| Table.View.cascadesMargin game.table)
-        |> div []
-
-
-cascadeCardView : Game -> Int -> Column -> Int -> Int -> Card -> Html Msg
-cascadeCardView game columnDepth column pileDepth inversedRow =
-    let
-        row =
-            (columnDepth - 1) - inversedRow
-
-        inPile =
-            inversedRow < pileDepth
-    in
-    cardView game (CascadeLoc column row) inPile
-
-
 cardCss : Float -> Card -> { cardImage : List Css.Style, sizing : List Css.Style, positioning : List Css.Style, all : List Css.Style }
 cardCss inset card =
     let
@@ -544,13 +520,62 @@ cardCss inset card =
             , height (px (Card.View.height - inset))
             ]
 
-        positioning =
+        cardAnimationMs =
+            300
+
+        zIndex_ =
+            if card.inMotion then
+                batch
+                    [ animationName
+                        (keyframes
+                            [ ( 0
+                              , [ property "z-index"
+                                    (String.fromInt (card.zIndex + 65))
+                                ]
+                              )
+                            , ( 100
+                              , [ property "z-index"
+                                    (String.fromInt card.zIndex)
+                                ]
+                              )
+                            ]
+                        )
+                    , animationDuration (Css.ms cardAnimationMs)
+                    , Css.property "animation-timing-function" "steps(1, end)"
+                    ]
+
+            else
+                zIndex (int card.zIndex)
+
+        staticPositioning =
             [ display inlineBlock
             , position absolute
             , top (px (card.position |> Tuple.second))
             , left (px (card.position |> Tuple.first))
             , zIndex (int card.zIndex)
             ]
+
+        positioningTransform =
+            case card.movingFrom of
+                Just movingFrom ->
+                    let
+                        ( dx, dy ) =
+                            Position.diff card.position movingFrom
+                    in
+                    transform (translate2 (px dx) (px dy))
+
+                Nothing ->
+                    transform (translate2 (px 0) (px 0))
+
+        positioningTranslation =
+            if card.inMotion then
+                transition [ Css.Transitions.transform3 cardAnimationMs 0 (cubicBezier 0.22 0.61 0.36 1) ]
+
+            else
+                transition []
+
+        positioning =
+            staticPositioning ++ [ positioningTransform, positioningTranslation, zIndex_ ]
     in
     { cardImage = cardImage
     , sizing = sizing
@@ -568,8 +593,18 @@ handCardView card =
     div [ css styles.all ] []
 
 
-cardView : Game -> TableLoc -> Bool -> Card -> Html Msg
-cardView game tableLoc inPile card =
+cardView : Game -> CardLoc -> Bool -> Card -> Html Msg
+cardView game cardLoc inPile card =
+    case cardLoc of
+        StaticLoc tableLoc ->
+            tableCardView game tableLoc inPile card
+
+        Hand _ ->
+            handCardView card
+
+
+tableCardView : Game -> TableLoc -> Bool -> Card -> Html Msg
+tableCardView game tableLoc inPile card =
     let
         getStack column row =
             game.table
@@ -637,8 +672,7 @@ cardView game tableLoc inPile card =
 
         cardHighlight =
             div
-                [ css styles.positioning
-                , cardCss (cardHighlightInset * 2) card |> .sizing |> css
+                [ cardCss (cardHighlightInset * 2) card |> .sizing |> css
                 , onMouseOver (GameMsg (FocusCard ( tableLoc, card ))) |> fromUnstyled
                 , css
                     [ margin (px cardHighlightInset)
@@ -661,7 +695,6 @@ cardView game tableLoc inPile card =
                 [ css <|
                     Css.backgroundColor (Css.rgba 0 0 0 0.17)
                         :: styles.sizing
-                        ++ styles.positioning
                 , onMouseEnter (FocusCard ( tableLoc, card ) |> GameMsg) |> fromUnstyled
                 ]
                 []
@@ -697,14 +730,16 @@ cardView game tableLoc inPile card =
         doHighlightCard =
             cardIsntAncestorOfFocusedCard || highlightNextFoundationalCard
     in
-    if doHighlightCard then
-        div [] [ div attrs [], cardHighlight ]
+    div attrs
+        (if doHighlightCard then
+            [ cardHighlight ]
 
-    else if not isCascade || inPile || isFocused then
-        div attrs []
+         else if not isCascade || inPile || isFocused then
+            []
 
-    else
-        div [] [ div attrs [], cardShroud ]
+         else
+            [ cardShroud ]
+        )
 
 
 activeMove : Game.State -> Html Msg

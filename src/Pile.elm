@@ -1,6 +1,6 @@
 module Pile exposing
     ( Pile
-    , fromCascade
+    , cascadeRow
     , hitbox
     , validPile
     )
@@ -35,37 +35,39 @@ validPile cards =
             True
 
 
-pileFinder : Row -> List Card -> Pile -> ( Row, Pile )
+pileFinder : Row -> List Card -> Pile -> Row
 pileFinder row remaining pile_ =
     case remaining of
         top :: second :: [] ->
             if validPilePair top second then
-                ( row - 1, List.append pile_ [ top, second ] )
+                row - 1
 
             else
-                ( row, List.append pile_ [ top ] )
+                row
 
         top :: second :: others ->
             if validPilePair top second then
                 pileFinder (row - 1) (second :: others) (List.append pile_ [ top ])
 
             else
-                ( row, List.append pile_ [ top ] )
+                row
 
-        top :: [] ->
+        _ :: [] ->
             -- A card by itself in a cascade is a pile
             if List.length pile_ == 0 then
-                ( row, [ top ] )
+                row
 
             else
-                ( row, pile_ )
+                row
 
         _ ->
-            ( row, pile_ )
+            row
 
 
-fromCascade : List Card -> ( Row, Pile )
-fromCascade cards =
+{-| Returns the row where a pile begins.
+-}
+cascadeRow : List Card -> Row
+cascadeRow cards =
     pileFinder (List.length cards - 1) cards []
 
 

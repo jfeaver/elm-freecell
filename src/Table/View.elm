@@ -22,6 +22,7 @@ module Table.View exposing
 import Array exposing (Array)
 import Basics.Extra exposing (divMod)
 import Card exposing (Card, Suit(..))
+import Card.Rank
 import Card.View
 import Cascade exposing (Column, Row)
 import Collision
@@ -105,9 +106,9 @@ horizontalOffset =
 
 {-| The left/right margin of the cascades.
 -}
-cascadesMargin : Table -> Float
-cascadesMargin table =
-    (width - toFloat table.cascadesCount * (Card.View.width + padding))
+cascadesMargin : Int -> Float
+cascadesMargin cascadesCount =
+    (width - toFloat cascadesCount * (Card.View.width + padding))
         / 2
         |> UI.roundToHalf
 
@@ -140,7 +141,7 @@ positionFor table tableLoc =
         CascadeLoc column row ->
             let
                 left =
-                    cascadesMargin table + toFloat column * (Card.View.width + padding)
+                    cascadesMargin table.cascadesCount + toFloat column * (Card.View.width + padding)
 
                 top =
                     cascadesTop + toFloat row * stackSpacing
@@ -162,7 +163,7 @@ cascadesLocFor : Table -> Position -> Maybe TableLoc
 cascadesLocFor table ( left, top ) =
     let
         xMargin =
-            cascadesMargin table
+            cascadesMargin table.cascadesCount
 
         x =
             left - xMargin
@@ -426,10 +427,10 @@ recursiveDeal table row column cascades deck =
                         CascadeLoc column row
 
                     cardLoc =
-                        Static (CascadeLoc column row)
+                        StaticLoc (CascadeLoc column row)
 
                     positionedCard =
-                        { card | position = positionFor table tableLoc, zIndex = zIndexFor cardLoc }
+                        { card | position = positionFor table tableLoc, zIndex = zIndexFor ( cardLoc, card ) }
 
                     cascade =
                         Array.get column cascades |> Maybe.withDefault []
@@ -448,21 +449,22 @@ deal table deck =
     { table | cascades = recursiveDeal table 0 0 table.cascades deck }
 
 
-zIndexFor : CardLoc -> Int
-zIndexFor cardLoc =
+zIndexFor : ( CardLoc, Card ) -> Int
+zIndexFor ( cardLoc, card ) =
     case cardLoc of
-        Static (CascadeLoc _ row) ->
+        -- Animating on the table gets a bump of 65 (in Main.elm)
+        StaticLoc (CascadeLoc _ row) ->
             row
 
         Hand depth ->
             150 - depth
 
-        Static (CellLoc _) ->
+        StaticLoc (CellLoc _) ->
             1
 
-        Static (FoundationLoc _) ->
-            -- Top card is two, decrement card is one
-            2
+        StaticLoc (FoundationLoc _) ->
+            card.rank
+                |> Card.Rank.toValue
 
 
 {-| Returns number of pixels that play is extending beyond normal table height

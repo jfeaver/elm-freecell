@@ -1,10 +1,13 @@
 module Table exposing
-    ( CardLoc(..)
+    ( AnimationState(..)
+    , CardLoc(..)
     , Cell
     , Depth
     , HitboxQuadMap
+    , InGameCard
     , Table
     , TableLoc(..)
+    , animateCards
     , callAsTableLocWithDefault
     , cascadeDepth
     , cascadeEmpty
@@ -12,6 +15,7 @@ module Table exposing
     , emptyCascades
     , emptyCells
     , getTableCard
+    , inGameCards
     , maxPileDepthAlgorithm
     , new
     , pickPile
@@ -20,7 +24,6 @@ module Table exposing
 
 import Array exposing (Array)
 import Card exposing (Card, Suit(..))
-import Card.Rank
 import Cascade exposing (Column, Row)
 import Hitbox exposing (Hitbox)
 import Html exposing (table)
@@ -29,8 +32,15 @@ import Maybe.Extra
 import Pile exposing (Pile, validPile)
 
 
+{-| The head of the list is the showing card.
+-}
 type alias Foundation =
-    Maybe Card
+    List Card
+
+
+type AnimationState
+    = StaticScene
+    | AnimationPending
 
 
 type alias Table =
@@ -43,6 +53,7 @@ type alias Table =
     , hearts : Foundation
     , spades : Foundation
     , hitboxes : HitboxQuadMap
+    , animation : AnimationState
     }
 
 
@@ -64,7 +75,7 @@ type alias Depth =
 
 type CardLoc
     = Hand Depth
-    | Static TableLoc
+    | StaticLoc TableLoc
 
 
 type TableLoc
@@ -79,11 +90,12 @@ new cellsCount cascadesCount =
     , cellsCount = cellsCount
     , cascades = Array.initialize cascadesCount (always [])
     , cascadesCount = cascadesCount
-    , diamonds = Nothing
-    , clubs = Nothing
-    , hearts = Nothing
-    , spades = Nothing
+    , diamonds = []
+    , clubs = []
+    , hearts = []
+    , spades = []
     , hitboxes = { foundations = [], cells = [], cascadesHalf = [], cascadesOthers = [] }
+    , animation = StaticScene
     }
 
 
@@ -149,20 +161,36 @@ pickPile tableLoc table =
         FoundationLoc suit ->
             case suit of
                 Diamonds ->
-                    table.diamonds
-                        |> Maybe.map (\card -> ( [ card ], { table | diamonds = Card.Rank.decrementCard card } ))
+                    case table.diamonds of
+                        card :: others ->
+                            Just ( [ card ], { table | diamonds = others } )
+
+                        [] ->
+                            Nothing
 
                 Clubs ->
-                    table.clubs
-                        |> Maybe.map (\card -> ( [ card ], { table | clubs = Card.Rank.decrementCard card } ))
+                    case table.clubs of
+                        card :: others ->
+                            Just ( [ card ], { table | clubs = others } )
+
+                        [] ->
+                            Nothing
 
                 Hearts ->
-                    table.hearts
-                        |> Maybe.map (\card -> ( [ card ], { table | hearts = Card.Rank.decrementCard card } ))
+                    case table.hearts of
+                        card :: others ->
+                            Just ( [ card ], { table | hearts = others } )
+
+                        [] ->
+                            Nothing
 
                 Spades ->
-                    table.spades
-                        |> Maybe.map (\card -> ( [ card ], { table | spades = Card.Rank.decrementCard card } ))
+                    case table.spades of
+                        card :: others ->
+                            Just ( [ card ], { table | spades = others } )
+
+                        [] ->
+                            Nothing
 
 
 getCell : Cell -> Table -> Maybe Card
@@ -177,7 +205,7 @@ callAsTableLocWithDefault default fn cardLoc =
         Hand _ ->
             default
 
-        Static tableLoc ->
+        StaticLoc tableLoc ->
             fn tableLoc
 
 
@@ -205,16 +233,16 @@ getTableCard tableLoc table =
         FoundationLoc foundation ->
             case foundation of
                 Diamonds ->
-                    table.diamonds
+                    List.head table.diamonds
 
                 Clubs ->
-                    table.clubs
+                    List.head table.clubs
 
                 Hearts ->
-                    table.hearts
+                    List.head table.hearts
 
                 Spades ->
-                    table.spades
+                    List.head table.spades
 
 
 cellEmpty : Cell -> Table -> Bool
@@ -287,3 +315,82 @@ emptyCells =
 maxPileDepthAlgorithm : (Int -> Int -> Int) -> Table -> Int
 maxPileDepthAlgorithm maxFn table =
     maxFn (emptyCascades table) (emptyCells table)
+
+
+animateCards : Table -> Table
+animateCards table =
+    { table
+        | diamonds = table.diamonds |> List.map Card.animate
+        , clubs = table.clubs |> List.map Card.animate
+        , hearts = table.hearts |> List.map Card.animate
+        , spades = table.spades |> List.map Card.animate
+        , cells = table.cells |> Array.map (Maybe.map Card.animate)
+        , cascades = table.cascades |> Array.map (List.map Card.animate)
+        , animation = StaticScene
+    }
+
+
+type alias InGameCard =
+    { card : Card
+    , cardLoc : CardLoc
+    , inPile : Bool
+    }
+
+
+{-| Note that this method does not return cards that are "in the game" that are
+in the hand of the player since those aren't tracked by the table.
+-}
+inGameCards : Table -> Array Row -> List InGameCard
+inGameCards table cascadesPileRows =
+    let
+        maybeCardCollector { cardLoc, mCard } locCards =
+            case mCard of
+                Just card ->
+                    { cardLoc = cardLoc, card = card, inPile = False } :: locCards
+
+                Nothing ->
+                    locCards
+
+        foundations =
+            [ ( StaticLoc (FoundationLoc Diamonds), table.diamonds )
+            , ( StaticLoc (FoundationLoc Clubs), table.clubs )
+            , ( StaticLoc (FoundationLoc Hearts), table.hearts )
+            , ( StaticLoc (FoundationLoc Spades), table.spades )
+            ]
+                |> List.map (\( cardLoc, cards ) -> List.map (\card -> { card = card, cardLoc = cardLoc, inPile = False }) cards)
+                |> List.foldl (++) []
+
+        cells =
+            table.cells
+                |> Array.indexedMap (\cell mCard -> { cardLoc = StaticLoc (CellLoc cell), mCard = mCard })
+                |> Array.foldl maybeCardCollector []
+
+        locatedCascadeCards column columnCards =
+            let
+                cascadePileRow =
+                    Array.get column cascadesPileRows
+                        -- Maybe the cascade column state is paired with its pile row state or we calculate the value as needed from the cards rather than on some separate array??
+                        |> Maybe.withDefault 53
+
+                rowsCount =
+                    List.length columnCards
+
+                row inversedRow =
+                    rowsCount - 1 - inversedRow
+            in
+            List.indexedMap
+                (\inversedRow card ->
+                    { cardLoc = StaticLoc (CascadeLoc column (row inversedRow))
+                    , card = card
+                    , inPile = row inversedRow >= cascadePileRow
+                    }
+                )
+                columnCards
+
+        cascades =
+            table.cascades
+                |> Array.indexedMap locatedCascadeCards
+                |> Array.toList
+                |> List.foldl (++) []
+    in
+    foundations ++ cells ++ cascades

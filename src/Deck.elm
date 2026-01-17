@@ -17,6 +17,16 @@ type alias DeckSelect =
     }
 
 
+suits : List Suit
+suits =
+    [ Spades, Diamonds, Clubs, Hearts ]
+
+
+ranks : List Rank
+ranks =
+    [ Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King ]
+
+
 initDeckSelect : DeckSelect
 initDeckSelect =
     { mParseResult = Nothing, input = "" }
@@ -38,7 +48,7 @@ fullSuit Spades == [ Card Spades Ace, Card Spades Two, Card Spades Three, Card S
 -}
 fullSuit : Suit -> Deck
 fullSuit suit =
-    List.map (Card ( 0, 0 ) 0 suit) [ Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, Jack, Queen, King ]
+    List.map (Card.new suit) ranks
         |> Deck
 
 
@@ -62,11 +72,6 @@ fullDeck == Deck [ Card Spades Ace, Card Spades Two, ... ]
 -}
 fullDeck : Deck
 fullDeck =
-    let
-        suits : List Suit
-        suits =
-            [ Spades, Diamonds, Clubs, Hearts ]
-    in
     List.map fullSuit suits
         |> merge
 

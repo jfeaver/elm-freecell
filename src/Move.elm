@@ -38,11 +38,11 @@ import Maybe.Extra
 import Move.Autosolve exposing (AutosolveOption(..))
 import Pile exposing (Pile)
 import Position exposing (Position)
-import Table exposing (CardLoc(..), Cell, Table, TableLoc(..))
+import Table exposing (AnimationState(..), CardLoc(..), Cell, Table, TableLoc(..))
 import Table.View
 
 
-type alias ManualMove =
+type alias DirectedMove =
     { from : TableLoc
     , to : TableLoc
     , pile : Pile
@@ -62,17 +62,27 @@ type alias AutosolvedMove =
 
 
 type Move
-    = Manual ManualMove
+    = DragAndDrop DirectedMove
+    | AutoMove DirectedMove
     | Autosolve AutosolvedMove
 
 
-new : ( TableLoc, Card ) -> Pile -> Position -> Move
-new ( tableLoc, topCard ) cardPile position =
+{-| Create a new DirectedMove type move.
+-}
+new : ( TableLoc, Card ) -> Pile -> Position -> Bool -> Move
+new ( tableLoc, topCard ) cardPile position isAutoMove =
     let
         zIndexInHand depth card =
-            { card | zIndex = Table.View.zIndexFor (Hand depth) }
+            { card | zIndex = Table.View.zIndexFor ( Hand depth, card ) }
+
+        constructor =
+            if isAutoMove then
+                AutoMove
+
+            else
+                DragAndDrop
     in
-    Manual
+    constructor
         { from = tableLoc
         , to = tableLoc
         , pile = List.indexedMap zIndexInHand cardPile
@@ -113,55 +123,57 @@ isAutosolveable table autosolvePreference card =
                         Spades ->
                             table.spades
 
-                foundationRankValue : Maybe Card -> Int
-                foundationRankValue mCard =
-                    case Maybe.map .rank mCard of
-                        Nothing ->
+                foundationRankValue : List Card -> Int
+                foundationRankValue cards =
+                    case cards of
+                        topCard :: _ ->
+                            case topCard.rank of
+                                Ace ->
+                                    1
+
+                                Two ->
+                                    2
+
+                                Three ->
+                                    3
+
+                                Four ->
+                                    4
+
+                                Five ->
+                                    5
+
+                                Six ->
+                                    6
+
+                                Seven ->
+                                    7
+
+                                Eight ->
+                                    8
+
+                                Nine ->
+                                    9
+
+                                Ten ->
+                                    10
+
+                                Jack ->
+                                    11
+
+                                Queen ->
+                                    12
+
+                                King ->
+                                    13
+
+                                Infinite ->
+                                    14
+
+                        [] ->
                             0
 
-                        Just Ace ->
-                            1
-
-                        Just Two ->
-                            2
-
-                        Just Three ->
-                            3
-
-                        Just Four ->
-                            4
-
-                        Just Five ->
-                            5
-
-                        Just Six ->
-                            6
-
-                        Just Seven ->
-                            7
-
-                        Just Eight ->
-                            8
-
-                        Just Nine ->
-                            9
-
-                        Just Ten ->
-                            10
-
-                        Just Jack ->
-                            11
-
-                        Just Queen ->
-                            12
-
-                        Just King ->
-                            13
-
-                        Just Infinite ->
-                            14
-
-                suitValueMapper =
+                suitFoundationValue =
                     foundationGetter >> foundationRankValue
 
                 minTupleValue ( a, b ) =
@@ -173,19 +185,19 @@ isAutosolveable table autosolvePreference card =
 
                 oppositeColorFoundationsValue =
                     Card.Color.suits notColor
-                        |> Tuple.mapBoth suitValueMapper suitValueMapper
+                        |> Tuple.mapBoth suitFoundationValue suitFoundationValue
                         |> minTupleValue
 
                 sameColorFoundationValue =
                     card.suit
                         |> Card.colorPairedSuit
-                        |> suitValueMapper
+                        |> suitFoundationValue
 
                 oppositeColorDependentsAreFreed _ =
-                    suitValueMapper card.suit < oppositeColorFoundationsValue + 2
+                    suitFoundationValue card.suit < oppositeColorFoundationsValue + 2
 
                 sameColorDependentsAreFreed _ =
-                    suitValueMapper card.suit < sameColorFoundationValue + 3
+                    suitFoundationValue card.suit < sameColorFoundationValue + 3
             in
             case autosolvePreference of
                 AlwaysAutosolve ->
@@ -264,7 +276,7 @@ autosolve table autosolvePreference =
         _ ->
             Maybe.map
                 (\( cardLoc, card ) ->
-                    ( Autosolve { from = cardLoc, card = card }
+                    ( Autosolve { from = cardLoc, card = { card | movingFrom = Just card.position } }
                     , cardLoc
                     )
                 )
@@ -283,26 +295,32 @@ wasAutosolved move =
 
 isDestructiveAutoSolveMove : Move -> Move -> Bool
 isDestructiveAutoSolveMove move manualMove =
+    let
+        checkPreviousMove previousMove =
+            case move of
+                Autosolve autosolveMove ->
+                    previousMove.to == autosolveMove.from
+
+                _ ->
+                    False
+    in
     case manualMove of
         Autosolve _ ->
             False
 
-        Manual previousMove ->
-            case move of
-                Manual _ ->
-                    False
+        DragAndDrop previousMove ->
+            checkPreviousMove previousMove
 
-                Autosolve autosolveMove ->
-                    previousMove.to == autosolveMove.from
+        AutoMove previousMove ->
+            checkPreviousMove previousMove
 
 
+{-| This updates drag and drop moves as the mouse moves around.
+-}
 update : Position -> Move -> Move
 update mousePosition theMove =
     case theMove of
-        Autosolve _ ->
-            theMove
-
-        Manual move ->
+        DragAndDrop move ->
             let
                 positionDiff =
                     Position.diff move.mouseStart mousePosition
@@ -312,19 +330,25 @@ update mousePosition theMove =
                         | position =
                             positionDiff
                                 |> Position.add move.topCardStart
-                                |> Position.add ( 0, Table.View.stackOffset (pileDepth (Manual move) - depth - 1) )
+                                |> Position.add ( 0, Table.View.stackOffset (pileDepth (DragAndDrop move) - depth - 1) )
                     }
 
                 updatedPile =
                     List.indexedMap updateCardPosition move.pile
             in
-            Manual { move | pile = updatedPile }
+            DragAndDrop { move | pile = updatedPile }
+
+        _ ->
+            theMove
 
 
 pile : Move -> Pile
 pile theMove =
     case theMove of
-        Manual move ->
+        DragAndDrop move ->
+            move.pile
+
+        AutoMove move ->
             move.pile
 
         Autosolve { card } ->
@@ -334,7 +358,10 @@ pile theMove =
 pileDepth : Move -> Int
 pileDepth theMove =
     case theMove of
-        Manual move ->
+        DragAndDrop move ->
+            move.pileDepth
+
+        AutoMove move ->
             move.pileDepth
 
         Autosolve _ ->
@@ -345,30 +372,36 @@ finalizeMoveToFoundation : Suit -> Table -> Card -> TableLoc -> Table
 finalizeMoveToFoundation suit table card foundationLoc =
     let
         updatedZIndex =
-            Table.View.zIndexFor (Static foundationLoc)
+            Table.View.zIndexFor ( StaticLoc foundationLoc, card )
 
         updatedPosition =
             Table.View.positionFor table foundationLoc
+
+        updatedCard =
+            { card | position = updatedPosition, zIndex = updatedZIndex }
     in
     case suit of
         Diamonds ->
-            { table | diamonds = Just { card | position = updatedPosition, zIndex = updatedZIndex } }
+            { table | diamonds = updatedCard :: table.diamonds, animation = AnimationPending }
 
         Clubs ->
-            { table | clubs = Just { card | position = updatedPosition, zIndex = updatedZIndex } }
+            { table | clubs = updatedCard :: table.clubs, animation = AnimationPending }
 
         Hearts ->
-            { table | hearts = Just { card | position = updatedPosition, zIndex = updatedZIndex } }
+            { table | hearts = updatedCard :: table.hearts, animation = AnimationPending }
 
         Spades ->
-            { table | spades = Just { card | position = updatedPosition, zIndex = updatedZIndex } }
+            { table | spades = updatedCard :: table.spades, animation = AnimationPending }
 
 
 finalize : Table -> Move -> Table
 finalize table theMove =
     case theMove of
-        Manual move ->
-            finalizeManualMove table move
+        DragAndDrop move ->
+            finalizeManualMove table False move
+
+        AutoMove move ->
+            finalizeManualMove table True move
 
         Autosolve { card } ->
             finalizeMoveToFoundation card.suit table card (FoundationLoc card.suit)
@@ -376,14 +409,21 @@ finalize table theMove =
 
 {-| Position the card, apply correct z index, and update the table
 -}
-finalizeManualMove : Table -> ManualMove -> Table
-finalizeManualMove table move =
+finalizeManualMove : Table -> Bool -> DirectedMove -> Table
+finalizeManualMove table isAnimated move =
     let
-        updatedZIndex =
-            Table.View.zIndexFor (Static move.to)
+        updatedZIndex card =
+            Table.View.zIndexFor ( StaticLoc move.to, card )
 
         updatedPosition =
             Table.View.positionFor table move.to
+
+        mMovingFrom card =
+            if isAnimated then
+                Just card.position
+
+            else
+                Nothing
     in
     case move.to of
         CascadeLoc column _ ->
@@ -394,14 +434,16 @@ finalizeManualMove table move =
                         |> Maybe.withDefault []
 
                 currentPileDepth =
-                    pileDepth (Manual move)
+                    pileDepth (DragAndDrop move)
 
                 positionCard depth card =
                     { card
                         | position =
                             updatedPosition
                                 |> Position.add ( 0, Table.View.stackOffset (currentPileDepth - depth - 1) )
-                        , zIndex = updatedZIndex + currentPileDepth - depth - 1
+                        , zIndex = updatedZIndex card + currentPileDepth - depth - 1
+                        , movingFrom = mMovingFrom card
+                        , inMotion = False
                     }
 
                 positionedMovePile =
@@ -415,19 +457,19 @@ finalizeManualMove table move =
                 updatedCascades =
                     Array.set column buildColumn table.cascades
             in
-            { table | cascades = updatedCascades }
+            { table | cascades = updatedCascades, animation = AnimationPending }
 
         CellLoc cell ->
             case move.pile of
                 [ card ] ->
                     let
                         updatedCard =
-                            { card | position = updatedPosition, zIndex = updatedZIndex }
+                            { card | position = updatedPosition, zIndex = updatedZIndex card, movingFrom = mMovingFrom card }
 
                         updatedCells =
                             Array.set cell (Just updatedCard) table.cells
                     in
-                    { table | cells = updatedCells }
+                    { table | cells = updatedCells, animation = AnimationPending }
 
                 _ ->
                     table
@@ -435,7 +477,7 @@ finalizeManualMove table move =
         FoundationLoc suit ->
             case move.pile of
                 [ card ] ->
-                    finalizeMoveToFoundation suit table card move.to
+                    finalizeMoveToFoundation suit table { card | movingFrom = mMovingFrom card } move.to
 
                 _ ->
                     table
@@ -446,11 +488,14 @@ undo table theMove =
     let
         undoMove =
             case theMove of
-                Manual move ->
-                    Manual { move | to = move.from, from = move.to }
+                DragAndDrop move ->
+                    AutoMove { move | to = move.from, from = move.to }
+
+                AutoMove move ->
+                    AutoMove { move | to = move.from, from = move.to }
 
                 Autosolve { from, card } ->
-                    new ( from, card ) [ card ] card.position
+                    new ( from, card ) [ card ] card.position True
     in
     finalize table undoMove
 
@@ -465,10 +510,16 @@ toCascade column table theMove =
 
         moveRow =
             List.length cascade
+
+        updateMove move =
+            { move | to = CascadeLoc column moveRow }
     in
     case theMove of
-        Manual move ->
-            Manual { move | to = CascadeLoc column moveRow }
+        DragAndDrop move ->
+            updateMove move |> DragAndDrop
+
+        AutoMove move ->
+            updateMove move |> AutoMove
 
         Autosolve _ ->
             theMove
@@ -477,8 +528,11 @@ toCascade column table theMove =
 toCell : Cell -> Move -> Move
 toCell cell theMove =
     case theMove of
-        Manual move ->
-            Manual { move | to = CellLoc cell }
+        DragAndDrop move ->
+            DragAndDrop { move | to = CellLoc cell }
+
+        AutoMove move ->
+            AutoMove { move | to = CellLoc cell }
 
         Autosolve _ ->
             theMove
@@ -487,8 +541,11 @@ toCell cell theMove =
 toFoundation : Suit -> Move -> Move
 toFoundation suit theMove =
     case theMove of
-        Manual move ->
-            Manual { move | to = FoundationLoc suit }
+        DragAndDrop move ->
+            DragAndDrop { move | to = FoundationLoc suit }
+
+        AutoMove move ->
+            AutoMove { move | to = FoundationLoc suit }
 
         Autosolve _ ->
             theMove
@@ -497,7 +554,10 @@ toFoundation suit theMove =
 color : Move -> CardColor
 color theMove =
     case theMove of
-        Manual move ->
+        DragAndDrop move ->
+            move.color
+
+        AutoMove move ->
             move.color
 
         Autosolve { card } ->
@@ -507,7 +567,10 @@ color theMove =
 rank : Move -> Rank
 rank theMove =
     case theMove of
-        Manual move ->
+        DragAndDrop move ->
+            move.rank
+
+        AutoMove move ->
             move.rank
 
         Autosolve { card } ->
@@ -517,7 +580,10 @@ rank theMove =
 to : Move -> TableLoc
 to theMove =
     case theMove of
-        Manual move ->
+        DragAndDrop move ->
+            move.to
+
+        AutoMove move ->
             move.to
 
         Autosolve { card } ->
@@ -527,7 +593,10 @@ to theMove =
 showingSuit : Move -> Suit
 showingSuit theMove =
     case theMove of
-        Manual move ->
+        DragAndDrop move ->
+            move.showingSuit
+
+        AutoMove move ->
             move.showingSuit
 
         Autosolve { card } ->
@@ -546,7 +615,10 @@ isFullCascade theMove =
                     False
     in
     case theMove of
-        Manual move ->
+        DragAndDrop move ->
+            checkLoc move.from
+
+        AutoMove move ->
             checkLoc move.from
 
         Autosolve { from } ->
@@ -565,7 +637,10 @@ startsFromCascade column theMove =
                     False
     in
     case theMove of
-        Manual { from } ->
+        DragAndDrop { from } ->
+            checkLoc from
+
+        AutoMove { from } ->
             checkLoc from
 
         Autosolve { from } ->
@@ -574,14 +649,21 @@ startsFromCascade column theMove =
 
 startsFromFoundation : Move -> Maybe Suit
 startsFromFoundation theMove =
-    case theMove of
-        Manual { from } ->
-            case from of
+    let
+        checkLoc loc =
+            case loc of
                 FoundationLoc foundation ->
                     Just foundation
 
                 _ ->
                     Nothing
+    in
+    case theMove of
+        DragAndDrop { from } ->
+            checkLoc from
+
+        AutoMove { from } ->
+            checkLoc from
 
         Autosolve _ ->
             Nothing
@@ -590,7 +672,10 @@ startsFromFoundation theMove =
 isNoOp : Move -> Bool
 isNoOp theMove =
     case theMove of
-        Manual move ->
+        DragAndDrop move ->
+            move.from == move.to
+
+        AutoMove move ->
             move.from == move.to
 
         Autosolve _ ->
@@ -600,7 +685,10 @@ isNoOp theMove =
 hitbox : Move -> Hitbox
 hitbox theMove =
     case theMove of
-        Manual move ->
+        DragAndDrop move ->
+            Pile.hitbox move.pile
+
+        AutoMove move ->
             Pile.hitbox move.pile
 
         Autosolve autosolvedMove ->
@@ -674,7 +762,7 @@ validToCell table move cell =
 validToFoundation : Table -> Move -> Suit -> Bool
 validToFoundation table move suit =
     let
-        foundationCard =
+        foundation =
             case suit of
                 Diamonds ->
                     table.diamonds
@@ -689,7 +777,7 @@ validToFoundation table move suit =
                     table.spades
 
         isIncrement =
-            case foundationCard of
+            case List.head foundation of
                 Just card ->
                     validIncrement move card
 

@@ -1,13 +1,29 @@
 module Rules exposing (autosolver, pickUps, putDowns)
 
 import Array
-import Card exposing (Card, Rank(..), Suit(..))
+import Card exposing (Rank(..), Suit(..))
 import Expect
-import Game exposing (Msg(..), State(..))
+import Game exposing (Game, MouseEventProcessLock(..), Msg(..), State(..))
 import Move
 import Move.Autosolve exposing (AutosolveOption(..))
 import Table exposing (Table, TableLoc(..))
 import Test exposing (..)
+
+
+emptyGame : AutosolveOption -> Game
+emptyGame autosolvePreference =
+    { table = Table.new 4 8
+    , state = Ready
+    , mouseEventProcessLock = Free
+    , lastMouseDown = Nothing
+    , doubleClickLast = False
+    , focusedCard = Nothing
+    , focusedFoundation = Nothing
+    , moveHistory = []
+    , number = -1
+    , select = Nothing
+    , autosolvePreference = autosolvePreference
+    }
 
 
 pickUps : Test
@@ -17,15 +33,15 @@ pickUps =
             \_ ->
                 let
                     pickedCard =
-                        Card ( 0, 0 ) 0 Hearts King
+                        Card.new Hearts King
 
                     aPickablePile =
-                        [ Card ( 0, 0 ) 0 Hearts Seven
-                        , Card ( 0, 0 ) 0 Spades Eight
-                        , Card ( 0, 0 ) 0 Hearts Nine
-                        , Card ( 0, 0 ) 0 Spades Ten
-                        , Card ( 0, 0 ) 0 Hearts Jack
-                        , Card ( 0, 0 ) 0 Spades Queen
+                        [ Card.new Hearts Seven
+                        , Card.new Spades Eight
+                        , Card.new Hearts Nine
+                        , Card.new Spades Ten
+                        , Card.new Hearts Jack
+                        , Card.new Spades Queen
                         , pickedCard
                         ]
 
@@ -54,7 +70,7 @@ pickUps =
                             |> Expect.equal 7
                     , \_ ->
                         -- The largest pile that is pickable should be 5
-                        Game.startMove ( tableLoc, pickedCard ) ( 0, 0 ) game
+                        Game.startMove ( tableLoc, pickedCard ) ( 0, 0 ) True game
                             |> .state
                             |> Expect.equal Ready
                     ]
@@ -66,7 +82,7 @@ pickUps =
                         Table.new 2 1
 
                     c rank suit =
-                        Card ( 0, 0 ) 0 suit rank
+                        Card.new suit rank
 
                     cascade =
                         [ c King Spades, c Queen Hearts, c Jack Spades ]
@@ -91,15 +107,15 @@ putDowns =
             \_ ->
                 let
                     pickedCard =
-                        Card ( 0, 0 ) 0 Hearts King
+                        Card.new Hearts King
 
                     pickedPile =
-                        [ Card ( 0, 0 ) 0 Hearts Seven
-                        , Card ( 0, 0 ) 0 Spades Eight
-                        , Card ( 0, 0 ) 0 Hearts Nine
-                        , Card ( 0, 0 ) 0 Spades Ten
-                        , Card ( 0, 0 ) 0 Hearts Jack
-                        , Card ( 0, 0 ) 0 Spades Queen
+                        [ Card.new Hearts Seven
+                        , Card.new Spades Eight
+                        , Card.new Hearts Nine
+                        , Card.new Spades Ten
+                        , Card.new Hearts Jack
+                        , Card.new Spades Queen
                         , pickedCard
                         ]
 
@@ -113,7 +129,7 @@ putDowns =
                         CascadeLoc 0 0
 
                     move =
-                        Move.new ( pickedFrom, pickedCard ) pickedPile ( 0, 0 )
+                        Move.new ( pickedFrom, pickedCard ) pickedPile ( 0, 0 ) True
 
                     gameState =
                         PlayerMove move
@@ -151,97 +167,93 @@ autosolver =
             \_ ->
                 let
                     -- 4 diamonds when 2 clubs and 2 spades are in foundations but 5 diamonds is too big
-                    card suit rank =
-                        Card ( 0, 0 ) 0 suit rank
-
                     threeDiamonds =
-                        card Diamonds Three
+                        Card.new Diamonds Three
 
                     fourDiamonds =
-                        card Diamonds Four
+                        Card.new Diamonds Four
 
                     fiveDiamonds =
-                        card Diamonds Five
+                        Card.new Diamonds Five
 
                     twoClubs =
-                        card Clubs Two
+                        Card.new Clubs Two
 
                     twoSpades =
-                        card Spades Two
+                        Card.new Spades Two
 
                     fourHearts =
-                        card Hearts Four
+                        Card.new Hearts Four
 
-                    emptyGame =
-                        Game.new 1 NonSupporting
+                    game =
+                        emptyGame NonSupporting
 
                     table : Table
                     table =
-                        emptyGame.table
+                        game.table
                             |> (\t ->
                                     { t
-                                        | diamonds = Just threeDiamonds
-                                        , clubs = Just twoClubs
-                                        , spades = Just twoSpades
-                                        , hearts = Just fourHearts
+                                        | diamonds = [ threeDiamonds ]
+                                        , clubs = [ twoClubs ]
+                                        , spades = [ twoSpades ]
+                                        , hearts = [ fourHearts ]
                                         , cells = Array.fromList [ Just fiveDiamonds, Just fourDiamonds ]
                                     }
                                )
 
                     updatedGame =
-                        { emptyGame | table = table } |> Game.update (Autosolve ( 0, 0 )) |> Tuple.first
+                        { game | table = table } |> Game.update (Autosolve ( 0, 0 ) False) |> Tuple.first
                 in
                 updatedGame.table.diamonds
+                    |> List.head
                     |> Maybe.map .rank
                     |> Expect.equal (Just Four)
         , test "cards whose rank is greater than the foundation rank of the matching color pair by more than 3 is not auto solved while lesser cards are auto solved." <|
             \_ ->
                 let
                     -- 6 diamonds when 2 hearts is maximum hearts foundation card since 4 hearts needs to be supported by a black five and six needs to support that five
-                    card suit rank =
-                        Card ( 0, 0 ) 0 suit rank
-
                     threeDiamonds =
-                        card Diamonds Three
+                        Card.new Diamonds Three
 
                     fourDiamonds =
-                        card Diamonds Four
+                        Card.new Diamonds Four
 
                     fiveDiamonds =
-                        card Diamonds Five
+                        Card.new Diamonds Five
 
                     sixDiamonds =
-                        card Diamonds Six
+                        Card.new Diamonds Six
 
                     fourClubs =
-                        card Clubs Four
+                        Card.new Clubs Four
 
                     fourSpades =
-                        card Spades Four
+                        Card.new Spades Four
 
                     twoHearts =
-                        card Hearts Two
+                        Card.new Hearts Two
 
-                    emptyGame =
-                        Game.new 1 NonSupporting
+                    game =
+                        emptyGame NonSupporting
 
                     table : Table
                     table =
-                        emptyGame.table
+                        game.table
                             |> (\t ->
                                     { t
-                                        | diamonds = Just threeDiamonds
-                                        , clubs = Just fourClubs
-                                        , spades = Just fourSpades
-                                        , hearts = Just twoHearts
+                                        | diamonds = [ threeDiamonds ]
+                                        , clubs = [ fourClubs ]
+                                        , spades = [ fourSpades ]
+                                        , hearts = [ twoHearts ]
                                         , cells = Array.fromList [ Just sixDiamonds, Just fiveDiamonds, Just fourDiamonds ]
                                     }
                                )
 
                     updatedGame =
-                        { emptyGame | table = table } |> Game.update (Autosolve ( 0, 0 )) |> Tuple.first
+                        { game | table = table } |> Game.update (Autosolve ( 0, 0 ) False) |> Tuple.first
                 in
                 updatedGame.table.diamonds
+                    |> List.head
                     |> Maybe.map .rank
                     |> Expect.equal (Just Five)
         ]

@@ -1,0 +1,131 @@
+module ManualTest exposing (..)
+
+import Array exposing (Array)
+import Browser
+import Card exposing (Card, Rank(..), Suit(..))
+import Cascade exposing (Column, Row)
+import Deck
+import Game exposing (Game, MouseEventProcessLock(..), Msg(..), State(..))
+import Main exposing (Model(..), Msg(..), update)
+import Move.Autosolve exposing (AutosolveOption(..))
+import Table exposing (CardLoc(..), Table, TableLoc(..))
+import Table.View exposing (positionFor, zIndexFor)
+
+
+main : Program () Model Main.Msg
+main =
+    Browser.document
+        { init = always initNoAutosolver
+        , view = Main.view
+        , update = Main.update
+        , subscriptions = Main.subscriptions
+        }
+
+
+{-| Use this version of init to play a curated board.
+-}
+init : ( Model, Cmd Main.Msg )
+init =
+    update (GameMsg (Autosolve ( 0, 0 ))) (InGame debugGame)
+
+
+{-| Use this version of init to play an easier game (88738).
+Or a game with a lot of early autosolver action (889412).
+-}
+initNumberedGame : ( Model, Cmd Main.Msg )
+initNumberedGame =
+    update (SetGame 889412) (InGame debugGame)
+
+
+{-| Use this version to play a curated board without immediately triggering the autosolver.
+-}
+initNoAutosolver : ( Model, Cmd Main.Msg )
+initNoAutosolver =
+    ( InGame debugGame, Cmd.none )
+
+
+cascadeCard : Table -> Column -> Row -> ( Rank, Suit ) -> Card
+cascadeCard table column row ( rank, suit ) =
+    let
+        tableLoc =
+            CascadeLoc column row
+
+        newCard =
+            Card.new suit rank
+    in
+    { newCard
+        | position = positionFor table tableLoc
+        , zIndex = zIndexFor ( StaticLoc tableLoc, newCard )
+    }
+
+
+debugTable : Table
+debugTable =
+    let
+        table =
+            Table.View.newTableWithCachedHitboxes 2 2
+
+        cascade1 =
+            -- [ ( King, Spades ), ( Two, Hearts ), ( Queen, Hearts ), ( Jack, Spades ), ( Ace, Spades ), ( Ten, Hearts ) ]
+            [ ( Ace, Spades ), ( Ten, Hearts ) ]
+                |> List.indexedMap (cascadeCard table 1)
+                |> List.reverse
+    in
+    { table
+        | cascades = Array.set 1 cascade1 table.cascades |> Array.set 0 [ cascadeCard table 0 0 ( Queen, Diamonds ) ]
+    }
+
+
+trickShuffle : Array Card -> List Card
+trickShuffle cards =
+    let
+        fourCards n =
+            [ 1, 2, 3, 4 ]
+                |> List.map (\suitN -> Array.get (suitN * 13 - (13 - n)) cards)
+
+        appendOnlyCards mCard cards_ =
+            case mCard of
+                Just card ->
+                    card :: cards_
+
+                Nothing ->
+                    cards_
+
+        compactList =
+            List.foldl appendOnlyCards []
+    in
+    [ 12, 1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 ]
+        |> List.map (fourCards >> compactList)
+        |> List.foldl (++) []
+
+
+perfectlyStackedTable : Table
+perfectlyStackedTable =
+    let
+        table =
+            Table.View.newTableWithCachedHitboxes 4 8
+
+        cards =
+            Deck.suits
+                |> List.map (\suit -> Deck.ranks |> List.map (Card.new suit))
+                |> List.foldl (++) []
+                |> Array.fromList
+                |> trickShuffle
+    in
+    Table.View.deal table (Deck.Deck cards)
+
+
+debugGame : Game
+debugGame =
+    { table = debugTable
+    , state = Ready
+    , mouseEventProcessLock = Free
+    , lastMouseDown = Nothing
+    , doubleClickLast = False
+    , focusedCard = Nothing
+    , focusedFoundation = Nothing
+    , moveHistory = []
+    , number = -1
+    , select = Nothing
+    , autosolvePreference = AlwaysAutosolve
+    }

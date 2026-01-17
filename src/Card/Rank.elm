@@ -1,4 +1,4 @@
-module Card.Rank exposing (decrementCard, increment, incrementN)
+module Card.Rank exposing (decrementCard, increment, incrementN, toValue)
 
 import Card exposing (Card, Rank(..))
 

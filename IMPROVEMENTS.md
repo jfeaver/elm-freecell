@@ -1,3 +1,4 @@
+- Undo doesn't animate cards
 - Does it work on mobile?
 - The way the autosolver is toggled off during undo is a surprising experience
 - highlight foundation where a hovered card could go
@@ -8,6 +9,10 @@
 - instructions (controls and link to game rules)
 - prefer auto moves to cascades that are piles from the very top
 - add a redo
+- change drag and drop pointer to a gripped hand?
+- Toss in Html.lazy ftw (follow the guide)
+- minify JS in build ftw (follow the guide)
+- animate failed drag and drop move returning to its origin
 - 50 images are loaded separately!! Let's embed the SVG directly?
 - CSS animations/animation frames (animate cancelled moves, auto moves, autosolved moves)
 - Error messages (Can't do that because ...)

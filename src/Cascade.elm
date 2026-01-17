@@ -11,6 +11,7 @@ type alias Column =
 
 
 {-| Rows start at 0 from the back of the stack (top of the screen) and increment through the stack.
+Note that the lists of cards held by Table.cascades are inverted (cards in the zeroth row are last in the list).
 -}
 type alias Row =
     Int

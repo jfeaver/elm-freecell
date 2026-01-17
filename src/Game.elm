@@ -64,6 +64,10 @@ type alias Game =
     }
 
 
+type alias AutosolverPause =
+    Bool
+
+
 type Msg
     = MouseDown ( TableLoc, Card ) Event
     | MouseMove Event
@@ -77,7 +81,8 @@ type Msg
     | Undo
     | Restart
     | Prefer AutosolveOption
-    | Autosolve Position
+    | Autosolve Position AutosolverPause
+    | AnimateCards Time.Posix
 
 
 new : Deck.Seed -> AutosolveOption -> Game
@@ -88,20 +93,33 @@ new deckSeed autosolvePreference =
 
         deck =
             Deck.fromSeed deckSeed
+
+        untouchedGame =
+            { table = Table.View.deal table deck
+            , state = Ready
+            , mouseEventProcessLock = Free
+            , lastMouseDown = Nothing
+            , doubleClickLast = False
+            , focusedCard = Nothing
+            , focusedFoundation = Nothing
+            , moveHistory = []
+            , number = deckSeed
+            , select = Nothing
+            , autosolvePreference = autosolvePreference
+            }
+
+        recurseAutosolver game =
+            let
+                ( updatedGame, recurse ) =
+                    autosolve ( 0, 0 ) game
+            in
+            if recurse then
+                recurseAutosolver updatedGame
+
+            else
+                game
     in
-    { table = Table.View.deal table deck
-    , state = Ready
-    , mouseEventProcessLock = Free
-    , lastMouseDown = Nothing
-    , doubleClickLast = False
-    , focusedCard = Nothing
-    , focusedFoundation = Nothing
-    , moveHistory = []
-    , number = deckSeed
-    , select = Nothing
-    , autosolvePreference = autosolvePreference
-    }
-        |> autosolve ( 0, 0 )
+    recurseAutosolver untouchedGame
 
 
 doubleClickUpdate : Game -> MouseDownDetail -> Position -> ( Game, Cmd Msg )
@@ -109,14 +127,14 @@ doubleClickUpdate game mouseDownDetail tableRelativeMousePosition =
     let
         autoMoveGame =
             game
-                |> startMove mouseDownDetail.locatedCard mouseDownDetail.position
+                |> startMove mouseDownDetail.locatedCard mouseDownDetail.position True
                 |> autoMove
                 |> Maybe.withDefault game
                 |> (\updatedGame -> { updatedGame | doubleClickLast = True })
     in
     autoMoveGame
         |> updateFocus tableRelativeMousePosition
-        |> (\updatedGame -> ( updatedGame, performMessage (Autosolve tableRelativeMousePosition) ))
+        |> (\updatedGame -> ( updatedGame, performMessage (Autosolve tableRelativeMousePosition True) ))
 
 
 updateFocus : Position -> Game -> Game
@@ -240,7 +258,7 @@ update msg game =
                                 mouseUpTablePosition =
                                     Position.diff ( tableEl.element.x, tableEl.element.y ) event.clientPos
                             in
-                            ( endMove mLandingLoc move game, performMessage (Autosolve mouseUpTablePosition) )
+                            ( endMove mLandingLoc move game, performMessage (Autosolve mouseUpTablePosition True) )
 
                 Err _ ->
                     ( game, Cmd.none )
@@ -316,13 +334,33 @@ update msg game =
             ( new game.number game.autosolvePreference, Cmd.none )
 
         Prefer autosolvePreference ->
-            ( { game | autosolvePreference = autosolvePreference }, performMessage (Autosolve ( 0, 0 )) )
+            ( { game | autosolvePreference = autosolvePreference }, performMessage (Autosolve ( 0, 0 ) True) )
 
-        Autosolve tableRelativeMousePosition ->
-            ( autosolve tableRelativeMousePosition game, Cmd.none )
+        Autosolve tableRelativeMousePosition isPaused ->
+            let
+                ( updatedGame, continue ) =
+                    autosolve tableRelativeMousePosition game
+
+                nextCmd =
+                    if continue && isPaused then
+                        Process.sleep 100 |> Task.perform (always (Autosolve tableRelativeMousePosition isPaused))
+
+                    else
+                        Cmd.none
+            in
+            if continue && not isPaused then
+                update (Autosolve tableRelativeMousePosition isPaused) updatedGame
+
+            else
+                ( updatedGame, nextCmd )
+
+        AnimateCards _ ->
+            ( { game | table = Table.animateCards game.table }, Cmd.none )
 
 
-autosolve : Position -> Game -> Game
+{-| Returns the game as well as a flag to indicate if the autosolver would like to continue.
+-}
+autosolve : Position -> Game -> ( Game, Bool )
 autosolve tableRelativeMousePosition game =
     let
         mMove _ =
@@ -347,10 +385,13 @@ autosolve tableRelativeMousePosition game =
             List.head game.moveHistory
                 |> Maybe.map (Move.isDestructiveAutoSolveMove move)
                 |> Maybe.withDefault False
+
+        continueAutosolver continue updatedGame =
+            ( updatedGame, continue )
     in
     case game.autosolvePreference of
         NoAutosolve ->
-            game
+            ( game, False )
 
         _ ->
             case mMove () of
@@ -359,26 +400,28 @@ autosolve tableRelativeMousePosition game =
                         game
                             |> updateFocus tableRelativeMousePosition
                             |> (\g -> { g | autosolvePreference = NoAutosolve })
+                            |> continueAutosolver False
 
                     else
                         ( move, cardLoc )
                             |> pickupCardForMove
                             |> putdownCardOnFoundation
                             |> updateGame move
-                            |> autosolve tableRelativeMousePosition
+                            |> continueAutosolver True
 
                 Nothing ->
                     game
                         |> updateFocus tableRelativeMousePosition
+                        |> continueAutosolver False
 
 
-startMove : ( TableLoc, Card ) -> Position -> Game -> Game
-startMove ( tableLoc, card ) position game =
+startMove : ( TableLoc, Card ) -> Position -> Bool -> Game -> Game
+startMove ( tableLoc, card ) position isAutoMove game =
     case game.state of
         Ready ->
             let
                 move pile =
-                    Move.new ( tableLoc, card ) pile position
+                    Move.new ( tableLoc, card ) pile position isAutoMove
             in
             case pickMovablePile tableLoc game of
                 Just ( pile, table ) ->
@@ -410,7 +453,7 @@ updateMouseMove position game =
                             mouseDownDetail.locatedCard |> Tuple.second
                     in
                     if not mouseDownDetail.mouseUpReceived && movement > 2 then
-                        startMove ( tableLoc, card ) mouseDownDetail.position game
+                        startMove ( tableLoc, card ) mouseDownDetail.position False game
 
                     else
                         game
